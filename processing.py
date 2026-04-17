@@ -1,20 +1,22 @@
 """
-PDF processing: inject an interactive click-to-toggle tab into PDFs.
-Also handles DOCX → PDF conversion via LibreOffice headless (full fidelity).
+PDF processing: add a click-to-reveal "sticky note" annotation to PDFs.
+
+Uses native PDF text annotations (/Subtype /Text) instead of form fields +
+JavaScript. This works in EVERY PDF viewer (Chrome, Safari, Firefox, Preview,
+iOS/Android, Adobe Reader) without needing any special software.
+
+Also handles DOCX → PDF conversion via LibreOffice headless.
 """
 import subprocess
-import uuid
-import os
 import tempfile
+import shutil
 from pathlib import Path
-from io import BytesIO
 
-from reportlab.pdfgen import canvas as rl_canvas
-from reportlab.lib.colors import HexColor
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import (
     NameObject, DictionaryObject, ArrayObject,
     NumberObject, FloatObject, create_string_object,
+    DecodedStreamObject,
 )
 
 
@@ -24,30 +26,23 @@ def convert_docx_to_pdf(docx_path: str, output_dir: str) -> str:
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Use a unique profile dir per conversion to allow concurrent calls
     profile = tempfile.mkdtemp(prefix="lo_profile_")
     try:
         cmd = [
-            "soffice",
-            "--headless",
+            "soffice", "--headless",
             f"-env:UserInstallation=file://{profile}",
             "--convert-to", "pdf",
             "--outdir", str(output_dir),
             str(docx_path),
         ]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode != 0:
             raise RuntimeError(f"LibreOffice conversion failed: {result.stderr}")
-
-        # LibreOffice produces <stem>.pdf in outdir
         out = output_dir / (docx_path.stem + ".pdf")
         if not out.exists():
             raise RuntimeError("LibreOffice did not produce expected output file")
         return str(out)
     finally:
-        import shutil
         shutil.rmtree(profile, ignore_errors=True)
 
 
@@ -61,56 +56,90 @@ def get_pdf_page_info(pdf_path: str):
     return len(reader.pages), sizes
 
 
-def _tab_size():
-    """Tiny square icon tab (size doesn't depend on label — it's always a small pin)."""
-    return 14.0, 14.0
+# Tab icon size (PDF points). MUST match the frontend TAB_W/TAB_H.
+TAB_W = 16.0
+TAB_H = 16.0
 
 
-def _compute_layout(click_x, click_y, page_w, page_h, tab_label="+", panel_h_hint=130):
-    """Tab placement: tiny icon at (click_x, click_y) as center.
-    Panel placement: fixed at bottom-center of page so it never overlaps body text.
-    MUST match the frontend computeLayout() in frontend.html."""
-    tab_w, tab_h = _tab_size()
-    panel_w = min(page_w - 40, 440.0)
-    panel_h = min(panel_h_hint, 180.0)
+def _compute_layout(click_x, click_y, page_w, page_h):
+    """Return tab rectangle clamped to page bounds. Click point = tab center."""
+    tab_w, tab_h = TAB_W, TAB_H
+    tab_x = max(2, min(page_w - tab_w - 2, click_x - tab_w / 2))
+    tab_y = max(2, min(page_h - tab_h - 2, click_y - tab_h / 2))
+    return {"tab_x": tab_x, "tab_y": tab_y, "tab_w": tab_w, "tab_h": tab_h}
 
-    # Tab: small icon, centered on click point, clamped to page with tiny margins
-    tab_x = click_x - tab_w / 2
-    tab_y = click_y - tab_h / 2
-    tab_x = max(4, min(page_w - tab_w - 4, tab_x))
-    tab_y = max(4, min(page_h - tab_h - 4, tab_y))
 
-    # Panel: fixed at bottom-center of page (predictable, never overlaps body)
-    panel_x = (page_w - panel_w) / 2
-    panel_y = 30.0
-
-    return dict(
-        tab_x=tab_x, tab_y=tab_y, tab_w=tab_w, tab_h=tab_h,
-        panel_x=panel_x, panel_y=panel_y, panel_w=panel_w, panel_h=panel_h,
+def _build_icon_appearance_stream(writer) -> "IndirectObject":
+    """Create a Form XObject that draws a small white box with gray 'v' chevron.
+    Used as the custom appearance (/AP /N) for our annotation so the icon looks
+    consistent across viewers instead of their default sticky-note graphic."""
+    # PDF content stream commands:
+    # - Draw a 14x14 white rectangle with a gray border
+    # - Draw a gray "v" inside using Helvetica 9pt
+    content = (
+        b"q\n"
+        b"0.5 0.5 0.5 RG\n"        # stroke color = gray
+        b"1 1 1 rg\n"              # fill color = white
+        b"0.75 w\n"                # line width
+        b"1 1 14 14 re\n"          # rectangle path (1,1) 14x14
+        b"B\n"                     # fill + stroke
+        b"Q\n"
+        b"q\n"
+        b"0.35 0.35 0.4 rg\n"      # text fill = dark gray
+        b"BT\n"
+        b"/F1 9 Tf\n"              # Helvetica 9pt
+        b"4.5 4.5 Td\n"            # move to text origin
+        b"(v) Tj\n"                # show "v"
+        b"ET\n"
+        b"Q\n"
     )
+
+    # Helvetica font resource (core PDF font, no embedding required)
+    font_dict = DictionaryObject({
+        NameObject("/Type"): NameObject("/Font"),
+        NameObject("/Subtype"): NameObject("/Type1"),
+        NameObject("/BaseFont"): NameObject("/Helvetica"),
+        NameObject("/Encoding"): NameObject("/WinAnsiEncoding"),
+    })
+    font_ref = writer._add_object(font_dict)
+
+    resources = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({
+            NameObject("/F1"): font_ref,
+        })
+    })
+
+    # The appearance stream itself
+    ap_stream = DecodedStreamObject()
+    ap_stream.set_data(content)
+    ap_stream[NameObject("/Type")] = NameObject("/XObject")
+    ap_stream[NameObject("/Subtype")] = NameObject("/Form")
+    ap_stream[NameObject("/FormType")] = NumberObject(1)
+    ap_stream[NameObject("/BBox")] = ArrayObject([
+        NumberObject(0), NumberObject(0),
+        NumberObject(16), NumberObject(16),
+    ])
+    ap_stream[NameObject("/Resources")] = resources
+
+    return writer._add_object(ap_stream)
 
 
 def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     """
-    Inject a click-to-toggle tab into a PDF.
+    Add a click-to-reveal sticky-note annotation to the PDF.
 
     config = {
-        "page_index": 0,              # which page (0-based)
-        "click_x": 300, "click_y": 80, # tab center in PDF coords
-        "tab_label": "Show details",
-        "hidden_text": "Revealed content here",
+        "page_index": 0,
+        "click_x": 300, "click_y": 80,   # tab center in PDF coords
+        "tab_label": "Note",              # popup title
+        "hidden_text": "Revealed content",
     }
     """
     page_index = int(config.get("page_index", 0))
     click_x = float(config["click_x"])
     click_y = float(config["click_y"])
-    tab_label = config.get("tab_label", "Show details")
-    hidden_text = config.get("hidden_text", "")
-
-    # First, we need a text-field widget on the target page. reportlab can only
-    # create forms on a new doc, so we build a minimal overlay PDF with just
-    # the text field, then merge it in. Actually it's easier to add the text
-    # field directly using pypdf low-level objects.
+    tab_label = (config.get("tab_label") or "Note").strip() or "Note"
+    hidden_text = config.get("hidden_text") or ""
 
     reader = PdfReader(input_pdf_path)
     writer = PdfWriter(clone_from=reader)
@@ -122,139 +151,43 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     page_w = float(box.width)
     page_h = float(box.height)
 
-    layout = _compute_layout(click_x, click_y, page_w, page_h, tab_label=tab_label)
+    layout = _compute_layout(click_x, click_y, page_w, page_h)
 
-    uniq = uuid.uuid4().hex[:8]
-    panel_name = f"hp_{uniq}"
-    btn_name = f"tb_{uniq}"
+    # Build custom appearance stream (small white box with "v")
+    ap_ref = _build_icon_appearance_stream(writer)
 
-    # Tab is a small chevron-style icon (matching user's sketch: subtle rectangle with V).
-    show_cap = "v"   # down-chevron feel when hidden
-    hide_cap = "^"   # up-chevron when visible
-
-    toggle_js = (
-        f'var f=this.getField("{panel_name}");'
-        f'var b=this.getField("{btn_name}");'
-        f'if(f.display==display.hidden){{f.display=display.visible;b.buttonSetCaption({_js_str(hide_cap)});}}'
-        f'else{{f.display=display.hidden;b.buttonSetCaption({_js_str(show_cap)});}}'
-    )
-    open_js = (
-        f'this.getField("{panel_name}").display=display.hidden;'
-        f'this.getField("{btn_name}").buttonSetCaption({_js_str(show_cap)});'
-    )
-
-    # --- Build the text field (hidden panel) ---
-    # Default appearance string: Helvetica 11, dark blue text
-    panel_da = create_string_object("/Helv 11 Tf 0.10 0.21 0.36 rg")
-
-    panel_mk = DictionaryObject({
-        NameObject("/BC"): ArrayObject([FloatObject(0.17), FloatObject(0.42), FloatObject(0.69)]),
-        NameObject("/BG"): ArrayObject([FloatObject(0.92), FloatObject(0.96), FloatObject(1.0)]),
-    })
-    panel_bs = DictionaryObject({
-        NameObject("/Type"): NameObject("/Border"),
-        NameObject("/W"): NumberObject(1),
-        NameObject("/S"): NameObject("/S"),
-    })
-
-    panel_field = DictionaryObject({
+    # Build the text (sticky-note) annotation
+    # This is a native PDF feature — no JavaScript, works in all viewers.
+    text_annot = DictionaryObject({
         NameObject("/Type"): NameObject("/Annot"),
-        NameObject("/Subtype"): NameObject("/Widget"),
-        NameObject("/FT"): NameObject("/Tx"),
-        NameObject("/Ff"): NumberObject((1 << 0) | (1 << 12)),  # ReadOnly + Multiline
-        NameObject("/T"): create_string_object(panel_name),
-        NameObject("/TU"): create_string_object("Hidden panel"),
-        NameObject("/V"): create_string_object(hidden_text),
-        NameObject("/DV"): create_string_object(hidden_text),
-        NameObject("/Rect"): ArrayObject([
-            FloatObject(layout["panel_x"]),
-            FloatObject(layout["panel_y"]),
-            FloatObject(layout["panel_x"] + layout["panel_w"]),
-            FloatObject(layout["panel_y"] + layout["panel_h"]),
-        ]),
-        NameObject("/MK"): panel_mk,
-        NameObject("/BS"): panel_bs,
-        NameObject("/DA"): panel_da,
-        # F flag bit 2 = Hidden: not shown on screen or print until JS reveals it.
-        # This makes the panel invisible in viewers without JS (Preview.app, browsers).
-        NameObject("/F"): NumberObject(2),
-        NameObject("/P"): page.indirect_reference,
-    })
-    panel_ref = writer._add_object(panel_field)
-
-    # --- Build the pushbutton (tab) ---
-    # Subtle appearance: white background, thin gray border, small gray chevron inside
-    btn_mk = DictionaryObject({
-        NameObject("/CA"): create_string_object(show_cap),
-        NameObject("/BC"): ArrayObject([FloatObject(0.45), FloatObject(0.45), FloatObject(0.50)]),
-        NameObject("/BG"): ArrayObject([FloatObject(1.0), FloatObject(1.0), FloatObject(1.0)]),
-    })
-    btn_bs = DictionaryObject({
-        NameObject("/Type"): NameObject("/Border"),
-        NameObject("/W"): NumberObject(1),
-        NameObject("/S"): NameObject("/S"),
-    })
-    action = DictionaryObject({
-        NameObject("/Type"): NameObject("/Action"),
-        NameObject("/S"): NameObject("/JavaScript"),
-        NameObject("/JS"): create_string_object(toggle_js),
-    })
-    btn_da = create_string_object("/Helv 9 Tf 0.35 0.35 0.40 rg")
-
-    tooltip = tab_label if tab_label and tab_label not in ("+", "Show details") else "Click to show/hide the hidden message"
-    btn_field = DictionaryObject({
-        NameObject("/Type"): NameObject("/Annot"),
-        NameObject("/Subtype"): NameObject("/Widget"),
-        NameObject("/FT"): NameObject("/Btn"),
-        NameObject("/Ff"): NumberObject(1 << 16),  # pushbutton
-        NameObject("/T"): create_string_object(btn_name),
-        NameObject("/TU"): create_string_object(tooltip),
+        NameObject("/Subtype"): NameObject("/Text"),
         NameObject("/Rect"): ArrayObject([
             FloatObject(layout["tab_x"]),
             FloatObject(layout["tab_y"]),
             FloatObject(layout["tab_x"] + layout["tab_w"]),
             FloatObject(layout["tab_y"] + layout["tab_h"]),
         ]),
-        NameObject("/MK"): btn_mk,
-        NameObject("/BS"): btn_bs,
-        NameObject("/A"): action,
-        NameObject("/H"): NameObject("/P"),
-        NameObject("/DA"): btn_da,
-        NameObject("/F"): NumberObject(4),
+        NameObject("/Contents"): create_string_object(hidden_text),
+        NameObject("/T"): create_string_object(tab_label),
+        NameObject("/Name"): NameObject("/Comment"),
+        NameObject("/Open"): NumberObject(0),          # popup closed by default
+        NameObject("/C"): ArrayObject([                 # icon tint color (viewers using default icon)
+            FloatObject(1.0), FloatObject(0.85), FloatObject(0.3),
+        ]),
+        NameObject("/F"): NumberObject(4),              # flags: Print
+        NameObject("/AP"): DictionaryObject({           # custom appearance
+            NameObject("/N"): ap_ref,
+        }),
         NameObject("/P"): page.indirect_reference,
     })
-    btn_ref = writer._add_object(btn_field)
 
-    # Attach to page annotations
+    annot_ref = writer._add_object(text_annot)
+
     annots_key = NameObject("/Annots")
     if annots_key in page:
-        page[annots_key].append(panel_ref)
-        page[annots_key].append(btn_ref)
+        page[annots_key].append(annot_ref)
     else:
-        page[annots_key] = ArrayObject([panel_ref, btn_ref])
+        page[annots_key] = ArrayObject([annot_ref])
 
-    # Ensure AcroForm exists and register fields there
-    root = writer._root_object
-    if "/AcroForm" not in root:
-        root[NameObject("/AcroForm")] = DictionaryObject({
-            NameObject("/Fields"): ArrayObject(),
-        })
-    acroform = root["/AcroForm"]
-    if "/Fields" not in acroform:
-        acroform[NameObject("/Fields")] = ArrayObject()
-    acroform["/Fields"].append(panel_ref)
-    acroform["/Fields"].append(btn_ref)
-    acroform[NameObject("/NeedAppearances")] = NumberObject(1)
-
-    # Document-level open action (JS)
-    writer.add_js(open_js)
-
-    os.makedirs(os.path.dirname(output_pdf_path), exist_ok=True)
     with open(output_pdf_path, "wb") as f:
         writer.write(f)
-
-
-def _js_str(s: str) -> str:
-    """JSON-style quote a JS string."""
-    import json
-    return json.dumps(s)
