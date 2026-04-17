@@ -1,0 +1,13 @@
+services:
+  pdf-tab-builder:
+    build: .
+    container_name: pdf-tab-builder
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - BASE_DIR=/data
+    # For large uploads, bump these if you reverse-proxy via nginx:
+    # client_max_body_size 500M; proxy_read_timeout 300s;
