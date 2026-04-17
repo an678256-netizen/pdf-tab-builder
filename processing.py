@@ -57,8 +57,8 @@ def get_pdf_page_info(pdf_path: str):
 
 
 # Tab icon size (PDF points). MUST match the frontend TAB_W/TAB_H.
-TAB_W = 16.0
-TAB_H = 16.0
+TAB_W = 18.0
+TAB_H = 18.0
 
 
 def _compute_layout(click_x, click_y, page_w, page_h):
@@ -74,21 +74,21 @@ def _build_icon_appearance_stream(writer) -> "IndirectObject":
     Used as the custom appearance (/AP /N) for our annotation so the icon looks
     consistent across viewers instead of their default sticky-note graphic."""
     # PDF content stream commands:
-    # - Draw a 14x14 white rectangle with a gray border
-    # - Draw a gray "v" inside using Helvetica 9pt
+    # - Draw an 18x18 white rectangle with a gray border
+    # - Draw a gray "v" inside using Helvetica 10pt
     content = (
         b"q\n"
         b"0.5 0.5 0.5 RG\n"        # stroke color = gray
         b"1 1 1 rg\n"              # fill color = white
         b"0.75 w\n"                # line width
-        b"1 1 14 14 re\n"          # rectangle path (1,1) 14x14
+        b"1 1 16 16 re\n"          # rectangle path (1,1) 16x16
         b"B\n"                     # fill + stroke
         b"Q\n"
         b"q\n"
-        b"0.35 0.35 0.4 rg\n"      # text fill = dark gray
+        b"0.3 0.3 0.35 rg\n"       # text fill = dark gray
         b"BT\n"
-        b"/F1 9 Tf\n"              # Helvetica 9pt
-        b"4.5 4.5 Td\n"            # move to text origin
+        b"/F1 10 Tf\n"             # Helvetica 10pt
+        b"5 5 Td\n"                # move to text origin
         b"(v) Tj\n"                # show "v"
         b"ET\n"
         b"Q\n"
@@ -117,7 +117,7 @@ def _build_icon_appearance_stream(writer) -> "IndirectObject":
     ap_stream[NameObject("/FormType")] = NumberObject(1)
     ap_stream[NameObject("/BBox")] = ArrayObject([
         NumberObject(0), NumberObject(0),
-        NumberObject(16), NumberObject(16),
+        NumberObject(18), NumberObject(18),
     ])
     ap_stream[NameObject("/Resources")] = resources
 
@@ -171,8 +171,8 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
         NameObject("/T"): create_string_object(tab_label),
         NameObject("/Name"): NameObject("/Comment"),
         NameObject("/Open"): NumberObject(0),          # popup closed by default
-        NameObject("/C"): ArrayObject([                 # icon tint color (viewers using default icon)
-            FloatObject(1.0), FloatObject(0.85), FloatObject(0.3),
+        NameObject("/C"): ArrayObject([                 # popup/icon color (white, was yellow sticky-note)
+            FloatObject(1.0), FloatObject(1.0), FloatObject(1.0),
         ]),
         NameObject("/F"): NumberObject(4),              # flags: Print
         NameObject("/AP"): DictionaryObject({           # custom appearance
