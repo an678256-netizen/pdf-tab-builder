@@ -61,37 +61,28 @@ def get_pdf_page_info(pdf_path: str):
     return len(reader.pages), sizes
 
 
-def _tab_size(label: str):
-    """Compute tab dimensions from label text. MUST match frontend tabSize()."""
-    s = label or "Show details"
-    char_width = 7.0   # ~7pt per char at 11pt Helvetica
-    padding = 20.0
-    w = max(60.0, min(160.0, len(s) * char_width + padding))
-    return w, 26.0
+def _tab_size():
+    """Tiny square icon tab (size doesn't depend on label — it's always a small pin)."""
+    return 14.0, 14.0
 
 
-def _compute_layout(click_x, click_y, page_w, page_h, tab_label="Show details", panel_h_hint=130):
-    """Given a click point (= desired tab center) in PDF coords, compute tab and
-    panel rectangles. MUST match the frontend computeLayout() in frontend.html."""
-    tab_w, tab_h = _tab_size(tab_label)
-    tab_w = min(tab_w, page_w - 40)
-    panel_w = min(page_w - 40, 420.0)
-    panel_h = min(panel_h_hint, page_h - tab_h - 60)
+def _compute_layout(click_x, click_y, page_w, page_h, tab_label="+", panel_h_hint=130):
+    """Tab placement: tiny icon at (click_x, click_y) as center.
+    Panel placement: fixed at bottom-center of page so it never overlaps body text.
+    MUST match the frontend computeLayout() in frontend.html."""
+    tab_w, tab_h = _tab_size()
+    panel_w = min(page_w - 40, 440.0)
+    panel_h = min(panel_h_hint, 180.0)
 
+    # Tab: small icon, centered on click point, clamped to page with tiny margins
     tab_x = click_x - tab_w / 2
     tab_y = click_y - tab_h / 2
-    tab_x = max(20, min(page_w - tab_w - 20, tab_x))
-    tab_y = max(20, min(page_h - tab_h - 20, tab_y))
+    tab_x = max(4, min(page_w - tab_w - 4, tab_x))
+    tab_y = max(4, min(page_h - tab_h - 4, tab_y))
 
-    panel_x = tab_x + tab_w / 2 - panel_w / 2
-    panel_x = max(20, min(page_w - panel_w - 20, panel_x))
-
-    # Prefer above the tab (higher y = above in PDF coords)
-    panel_y = tab_y + tab_h + 10
-    if panel_y + panel_h > page_h - 20:
-        panel_y = tab_y - panel_h - 10
-        if panel_y < 20:
-            panel_y = 20
+    # Panel: fixed at bottom-center of page (predictable, never overlaps body)
+    panel_x = (page_w - panel_w) / 2
+    panel_y = 30.0
 
     return dict(
         tab_x=tab_x, tab_y=tab_y, tab_w=tab_w, tab_h=tab_h,
@@ -137,8 +128,9 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     panel_name = f"hp_{uniq}"
     btn_name = f"tb_{uniq}"
 
-    show_cap = tab_label
-    hide_cap = ("Hide " + tab_label.lower()[5:]) if tab_label.lower().startswith("show ") else "Hide"
+    # Tab is always a small "+" icon. Toggles to "−" when the panel is shown.
+    show_cap = "+"   # shown when hidden panel is NOT visible (invites click)
+    hide_cap = "-"   # shown when hidden panel IS visible (invites click to close)
 
     toggle_js = (
         f'var f=this.getField("{panel_name}");'
@@ -206,15 +198,16 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
         NameObject("/S"): NameObject("/JavaScript"),
         NameObject("/JS"): create_string_object(toggle_js),
     })
-    btn_da = create_string_object("/Helv 13 Tf 1 1 1 rg")
+    btn_da = create_string_object("/Helv 10 Tf 1 1 1 rg")
 
+    tooltip = tab_label if tab_label and tab_label not in ("+", "Show details") else "Click to show/hide the hidden message"
     btn_field = DictionaryObject({
         NameObject("/Type"): NameObject("/Annot"),
         NameObject("/Subtype"): NameObject("/Widget"),
         NameObject("/FT"): NameObject("/Btn"),
         NameObject("/Ff"): NumberObject(1 << 16),  # pushbutton
         NameObject("/T"): create_string_object(btn_name),
-        NameObject("/TU"): create_string_object("Click to show/hide"),
+        NameObject("/TU"): create_string_object(tooltip),
         NameObject("/Rect"): ArrayObject([
             FloatObject(layout["tab_x"]),
             FloatObject(layout["tab_y"]),
