@@ -269,19 +269,13 @@ const api = {
 // =========================================================================
 // Layout math — MUST match backend processing.py exactly
 // =========================================================================
-const TAB_W = 14, TAB_H = 14;   // Tiny square icon
-const MARGIN_X = 15;             // Left margin X position for anchored tabs
+const TAB_W = 16, TAB_H = 16;
 
-function computeLayout(clickX, clickY, pageW, pageH, panelHHint = 130) {
-  const tabW = TAB_W, tabH = TAB_H;
-  const panelW = Math.min(pageW - 40, 440);
-  const panelH = Math.min(panelHHint, 180);
-  let tabX = clickX - tabW / 2, tabY = clickY - tabH / 2;
-  tabX = Math.max(4, Math.min(pageW - tabW - 4, tabX));
-  tabY = Math.max(4, Math.min(pageH - tabH - 4, tabY));
-  const panelX = (pageW - panelW) / 2;
-  const panelY = 30;
-  return { tabX, tabY, tabW, tabH, panelX, panelY, panelW, panelH };
+function computeLayout(clickX, clickY, pageW, pageH) {
+  let tabX = clickX - TAB_W / 2, tabY = clickY - TAB_H / 2;
+  tabX = Math.max(2, Math.min(pageW - TAB_W - 2, tabX));
+  tabY = Math.max(2, Math.min(pageH - TAB_H - 2, tabY));
+  return { tabX, tabY, tabW: TAB_W, tabH: TAB_H };
 }
 
 // =========================================================================
@@ -482,33 +476,16 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
   if (tabClick && dims.pdfW) {
     const s = fitScale * zoom;
     const layout = computeLayout(tabClick.x, tabClick.y, dims.pdfW, dims.pdfH);
-    const css = (r) => ({
+    const tabCss = {
       position: "absolute",
-      left: r.x * s,
-      top: (dims.pdfH - (r.y + r.h)) * s,
-      width: r.w * s,
-      height: r.h * s,
-    });
-    const tabR = { x: layout.tabX, y: layout.tabY, w: layout.tabW, h: layout.tabH };
-    const panelR = { x: layout.panelX, y: layout.panelY, w: layout.panelW, h: layout.panelH };
-    // Dotted line connecting tab center to panel top
-    const linkLeft = (layout.tabX + layout.tabW / 2) * s;
-    const linkTop = (dims.pdfH - (layout.tabY)) * s;
-    const linkBottom = (dims.pdfH - (layout.panelY + layout.panelH)) * s;
-    const linkStyle = {
-      position: "absolute",
-      left: linkLeft, top: linkTop,
-      width: 0, height: Math.max(0, linkBottom - linkTop),
+      left: layout.tabX * s,
+      top: (dims.pdfH - (layout.tabY + layout.tabH)) * s,
+      width: layout.tabW * s,
+      height: layout.tabH * s,
     };
     const tabFontSize = Math.max(8, layout.tabW * s * 0.6);
     overlay = (
-      <>
-        <div className="overlay overlay-link" style={linkStyle} />
-        <div className="overlay overlay-panel" style={css(panelR)}>
-          <div className="overlay-panel-label">Hidden message appears here</div>
-        </div>
-        <div className="overlay overlay-tab" style={{ ...css(tabR), fontSize: tabFontSize, lineHeight: 1 }}>v</div>
-      </>
+      <div className="overlay overlay-tab" style={{ ...tabCss, fontSize: tabFontSize, lineHeight: 1 }}>v</div>
     );
   }
 
@@ -595,17 +572,11 @@ function UploadScreen({ onDone, initialFiles }) {
         )}
         <input ref={inputRef} type="file" multiple accept=".pdf,.docx" style={{ display: "none" }} onChange={(e) => doUpload(e.target.files)} />
       </div>
-      <div style={{ marginTop: 24, background: "#fffbeb", border: "1.5px solid #f59e0b", borderRadius: 12, padding: "16px 18px" }}>
+      <div style={{ marginTop: 24, background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: 12, padding: "14px 18px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-          <div style={{ fontSize: 24, flexShrink: 0 }}>⚠️</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, color: "#78350f", marginBottom: 4 }}>You need Adobe Acrobat Reader to open these PDFs</div>
-            <div style={{ fontSize: 14, color: "#92400e", lineHeight: 1.5, marginBottom: 10 }}>
-              Mac Preview, Chrome, Safari, and Firefox <b>won't work</b>. They can't run the click-to-reveal script — the button will just sit there doing nothing. Adobe Reader is free.
-            </div>
-            <a href="https://get.adobe.com/reader/" target="_blank" rel="noopener" className="btn-accent" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", fontSize: 13, padding: "8px 14px" }}>
-              Download Adobe Reader (free) ↗
-            </a>
+          <div style={{ fontSize: 20, flexShrink: 0 }}>✨</div>
+          <div style={{ flex: 1, fontSize: 14, color: "#166534", lineHeight: 1.55 }}>
+            <b style={{ color: "#14532d" }}>Works in every PDF viewer.</b> The hidden message is added as a standard PDF note — click the icon in Chrome, Safari, Mac Preview, iPhone Files, Adobe Reader, anywhere, and the popup appears. No downloads needed.
           </div>
         </div>
       </div>
@@ -650,11 +621,6 @@ function FileListScreen({ files, stats, onEdit, onUpload, onRefresh, onReset }) 
 
   return (
     <div className="list-page">
-      <div style={{ background: "#fffbeb", border: "1px solid #f59e0b", borderRadius: 10, padding: "10px 14px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "#78350f" }}>
-        <span style={{ fontSize: 16 }}>⚠️</span>
-        <span style={{ flex: 1 }}>Output PDFs must be opened in <b>Adobe Acrobat Reader</b> — the v button won't work in Chrome, Preview, or other viewers.</span>
-        <a href="https://get.adobe.com/reader/" target="_blank" rel="noopener" style={{ color: "#b45309", fontWeight: 600, textDecoration: "underline", whiteSpace: "nowrap" }}>Get it free ↗</a>
-      </div>
       <div className="list-header">
         <div>
           <h1 className="list-title">Your documents</h1>
@@ -895,9 +861,9 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
             </div>
           )}
 
-          <div className="compat-notice">
-            <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Only works in Adobe Reader</div>
-            <div>Chrome, Preview, Safari won't run the toggle. <a href="https://get.adobe.com/reader/" target="_blank" rel="noopener" style={{ color: "#92400e", fontWeight: 600 }}>Get Adobe Reader (free) ↗</a></div>
+          <div style={{ background: "#f0fdf4", border: "1px solid #86efac", color: "#166534", padding: "10px 12px", borderRadius: 8, fontSize: 12, lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 700, marginBottom: 3 }}>✨ Works in every PDF viewer</div>
+            <div>Chrome, Safari, Preview, mobile — tap the icon and the message shows up. No special app needed.</div>
           </div>
 
           {file.error_msg && (
