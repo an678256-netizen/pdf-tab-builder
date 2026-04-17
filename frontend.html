@@ -270,6 +270,7 @@ const api = {
 // Layout math — MUST match backend processing.py exactly
 // =========================================================================
 const TAB_W = 16, TAB_H = 16;
+const MARGIN_X = 15;  // Default left-margin X position for unanchored tabs
 
 function computeLayout(clickX, clickY, pageW, pageH) {
   let tabX = clickX - TAB_W / 2, tabY = clickY - TAB_H / 2;
