@@ -128,9 +128,9 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     panel_name = f"hp_{uniq}"
     btn_name = f"tb_{uniq}"
 
-    # Tab is always a small "+" icon. Toggles to "−" when the panel is shown.
-    show_cap = "+"   # shown when hidden panel is NOT visible (invites click)
-    hide_cap = "-"   # shown when hidden panel IS visible (invites click to close)
+    # Tab is a small chevron-style icon (matching user's sketch: subtle rectangle with V).
+    show_cap = "v"   # down-chevron feel when hidden
+    hide_cap = "^"   # up-chevron when visible
 
     toggle_js = (
         f'var f=this.getField("{panel_name}");'
@@ -183,10 +183,11 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     panel_ref = writer._add_object(panel_field)
 
     # --- Build the pushbutton (tab) ---
+    # Subtle appearance: white background, thin gray border, small gray chevron inside
     btn_mk = DictionaryObject({
         NameObject("/CA"): create_string_object(show_cap),
-        NameObject("/BC"): ArrayObject([FloatObject(0.17), FloatObject(0.42), FloatObject(0.69)]),
-        NameObject("/BG"): ArrayObject([FloatObject(0.17), FloatObject(0.42), FloatObject(0.69)]),
+        NameObject("/BC"): ArrayObject([FloatObject(0.45), FloatObject(0.45), FloatObject(0.50)]),
+        NameObject("/BG"): ArrayObject([FloatObject(1.0), FloatObject(1.0), FloatObject(1.0)]),
     })
     btn_bs = DictionaryObject({
         NameObject("/Type"): NameObject("/Border"),
@@ -198,7 +199,7 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
         NameObject("/S"): NameObject("/JavaScript"),
         NameObject("/JS"): create_string_object(toggle_js),
     })
-    btn_da = create_string_object("/Helv 10 Tf 1 1 1 rg")
+    btn_da = create_string_object("/Helv 9 Tf 0.35 0.35 0.40 rg")
 
     tooltip = tab_label if tab_label and tab_label not in ("+", "Show details") else "Click to show/hide the hidden message"
     btn_field = DictionaryObject({
