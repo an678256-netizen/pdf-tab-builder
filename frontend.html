@@ -2,129 +2,432 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
 <title>PDF Tab Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";</script>
 <style>
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; height: 100%; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #e2e8f0; }
-  #root { min-height: 100vh; display: flex; flex-direction: column; }
+  :root {
+    --bg: #faf9f6;
+    --bg-card: #ffffff;
+    --bg-soft: #f4f2ed;
+    --text: #1c1b17;
+    --text-muted: #6b6862;
+    --text-subtle: #9a9690;
+    --border: #e5e2db;
+    --border-strong: #d4d0c5;
+    --accent: #2563eb;
+    --accent-dark: #1d4ed8;
+    --accent-soft: #eff6ff;
+    --success: #16a34a;
+    --success-soft: #f0fdf4;
+    --warn: #d97706;
+    --danger: #dc2626;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 20px;
+    --shadow-sm: 0 1px 2px rgba(28, 27, 23, 0.04), 0 1px 3px rgba(28, 27, 23, 0.06);
+    --shadow: 0 4px 12px rgba(28, 27, 23, 0.06), 0 2px 4px rgba(28, 27, 23, 0.04);
+    --shadow-lg: 0 12px 32px rgba(28, 27, 23, 0.10), 0 4px 8px rgba(28, 27, 23, 0.06);
+  }
 
-  /* Top bar */
-  .topbar { background: #1e293b; border-bottom: 1px solid #334155; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; position: sticky; top: 0; z-index: 10; }
-  .brand { font-weight: 700; font-size: 16px; color: #f1f5f9; display: flex; align-items: center; gap: 8px; }
-  .brand-badge { background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.5px; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
+  #root { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 
-  .stats-strip { display: flex; gap: 14px; font-size: 13px; color: #94a3b8; flex-wrap: wrap; }
-  .stat-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 999px; }
+  button { font-family: inherit; cursor: pointer; border: none; border-radius: var(--radius-sm); font-weight: 500; transition: transform 0.1s, box-shadow 0.15s, background 0.15s, color 0.15s; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:not(:disabled):active { transform: scale(0.98); }
+
+  .btn-primary { background: var(--text); color: var(--bg); padding: 12px 22px; font-size: 15px; font-weight: 600; box-shadow: var(--shadow-sm); }
+  .btn-primary:hover:not(:disabled) { background: #000; box-shadow: var(--shadow); }
+
+  .btn-accent { background: var(--accent); color: white; padding: 12px 22px; font-size: 15px; font-weight: 600; box-shadow: var(--shadow-sm); }
+  .btn-accent:hover:not(:disabled) { background: var(--accent-dark); box-shadow: var(--shadow); }
+
+  .btn-secondary { background: var(--bg-card); color: var(--text); padding: 11px 20px; font-size: 14px; font-weight: 500; border: 1px solid var(--border-strong); }
+  .btn-secondary:hover:not(:disabled) { background: var(--bg-soft); }
+
+  .btn-ghost { background: transparent; color: var(--text-muted); padding: 8px 14px; font-size: 14px; font-weight: 500; }
+  .btn-ghost:hover:not(:disabled) { color: var(--text); background: var(--bg-soft); }
+
+  .btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); font-size: 16px; }
+  .btn-icon:hover:not(:disabled) { background: var(--bg-soft); border-color: var(--border-strong); }
+
+  .input, .textarea { width: 100%; padding: 12px 14px; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; color: var(--text); font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
+  .input:focus, .textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+
+  .label { font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; display: block; letter-spacing: -0.005em; }
+
+  /* === Top bar === */
+  .topbar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: var(--text); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; font-family: var(--serif); }
+  .brand-name { font-family: var(--serif); font-weight: 600; font-size: 19px; letter-spacing: -0.015em; }
+
+  /* === Upload page === */
+  .upload-page { max-width: 680px; margin: 0 auto; padding: 40px 20px; width: 100%; }
+  .upload-hero { text-align: center; margin-bottom: 32px; }
+  .upload-title { font-family: var(--serif); font-size: 40px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.1; margin: 0 0 12px; }
+  .upload-title em { font-style: italic; color: var(--accent); font-weight: 400; }
+  .upload-sub { font-size: 17px; color: var(--text-muted); margin: 0; }
+
+  .drop-zone {
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius-lg);
+    padding: 56px 24px;
+    text-align: center;
+    background: var(--bg-card);
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .drop-zone:hover, .drop-zone.dragging { border-color: var(--accent); background: var(--accent-soft); }
+  .drop-icon { font-size: 44px; margin-bottom: 12px; }
+  .drop-heading { font-weight: 600; font-size: 17px; margin-bottom: 6px; }
+  .drop-sub { font-size: 14px; color: var(--text-muted); }
+
+  .help-note {
+    background: var(--bg-soft);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-top: 24px;
+  }
+  .help-note b { color: var(--text); font-weight: 600; }
+
+  /* === File list === */
+  .list-page { max-width: 960px; margin: 0 auto; padding: 32px 20px; width: 100%; }
+  .list-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; gap: 16px; flex-wrap: wrap; }
+  .list-title { font-family: var(--serif); font-size: 32px; font-weight: 500; letter-spacing: -0.02em; margin: 0; }
+  .list-count { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+  .stats-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+  }
   .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
-  .dot-pending { background: #64748b; }
-  .dot-configured { background: #eab308; }
-  .dot-processed { background: #10b981; }
-  .dot-error { background: #ef4444; }
-  .dot-skipped { background: #9ca3af; }
+  .dot-pending { background: var(--text-subtle); }
+  .dot-processing { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+  .dot-done { background: var(--success); }
+  .dot-error { background: var(--danger); }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
-  button { font-family: inherit; cursor: pointer; border-radius: 8px; font-weight: 500; transition: all 0.15s; border: none; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; padding: 9px 16px; font-size: 13px; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3); }
-  .btn-primary:hover:not(:disabled) { box-shadow: 0 4px 12px rgba(59, 130, 246, 0.5); transform: translateY(-1px); }
-  .btn-secondary { background: #334155; color: #e2e8f0; padding: 9px 16px; font-size: 13px; border: 1px solid #475569; }
-  .btn-secondary:hover:not(:disabled) { background: #475569; }
-  .btn-ghost { background: transparent; color: #94a3b8; padding: 7px 12px; font-size: 13px; }
-  .btn-ghost:hover:not(:disabled) { color: #e2e8f0; background: #1e293b; }
-  .btn-danger { background: #991b1b; color: white; padding: 9px 16px; font-size: 13px; }
-  .btn-danger:hover:not(:disabled) { background: #7f1d1d; }
-  .btn-success { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 9px 16px; font-size: 13px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3); }
-
-  .input, .textarea { width: 100%; padding: 9px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; font-size: 13px; color: #e2e8f0; font-family: inherit; }
-  .input:focus, .textarea:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
-  .textarea { min-height: 100px; resize: vertical; font-family: inherit; }
-  .label { font-size: 11px; font-weight: 600; color: #94a3b8; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: 0.5px; }
-
-  /* Upload zone */
-  .upload-page { max-width: 720px; margin: 40px auto; padding: 0 20px; }
-  .drop-zone { border: 2px dashed #334155; border-radius: 16px; padding: 60px 24px; text-align: center; background: #1e293b; transition: all 0.2s; cursor: pointer; }
-  .drop-zone:hover, .drop-zone.dragging { border-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
-  .drop-icon { font-size: 48px; margin-bottom: 12px; }
-  .h1 { font-size: 26px; font-weight: 700; color: #f1f5f9; margin: 0 0 6px; }
-  .muted { color: #94a3b8; font-size: 13px; }
-  .info-box { background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.3); color: #bfdbfe; padding: 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
-
-  /* File list */
-  .file-list-page { max-width: 1200px; margin: 20px auto; padding: 0 20px; width: 100%; }
   .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
-  .search { flex: 1; min-width: 200px; max-width: 360px; position: relative; }
-  .search input { padding-left: 34px; }
-  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; }
-  .file-table { background: #1e293b; border: 1px solid #334155; border-radius: 12px; overflow: hidden; }
-  .file-row { display: grid; grid-template-columns: 30px 1fr 120px 100px 100px; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid #334155; font-size: 13px; cursor: pointer; transition: background 0.1s; }
-  .file-row:hover { background: #273449; }
+  .search-wrap { flex: 1; min-width: 200px; max-width: 340px; position: relative; }
+  .search-wrap input { padding-left: 40px; }
+  .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-subtle); font-size: 14px; pointer-events: none; }
+
+  .file-grid { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+  .file-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
   .file-row:last-child { border-bottom: none; }
-  .file-row.selected { background: rgba(59, 130, 246, 0.1); }
-  .file-row.header { font-weight: 600; color: #94a3b8; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; cursor: default; background: #0f172a; }
-  .file-row.header:hover { background: #0f172a; }
-  .file-icon { font-size: 16px; }
-  .filename { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0; }
-  .file-pages { color: #64748b; font-size: 12px; }
+  .file-row:hover { background: var(--bg-soft); }
+  .file-row.done { background: var(--success-soft); }
+  .file-row.done:hover { background: #e8f8ee; }
+  .file-check { width: 22px; height: 22px; border: 2px solid var(--border-strong); border-radius: 6px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-card); }
+  .file-check.checked { background: var(--accent); border-color: var(--accent); color: white; }
+  .file-icon { font-size: 20px; flex-shrink: 0; }
+  .file-info { flex: 1; min-width: 0; }
+  .file-name { font-weight: 500; font-size: 15px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-meta { font-size: 12px; color: var(--text-subtle); margin-top: 2px; }
+  .file-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+  .status-pending { background: var(--bg-soft); color: var(--text-muted); }
+  .status-processing { background: #fef3c7; color: #92400e; }
+  .status-done { background: var(--success-soft); color: #15803d; }
+  .status-error { background: #fee2e2; color: #991b1b; }
+  .status-skipped { background: var(--bg-soft); color: var(--text-subtle); }
 
-  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; border: 1px solid; }
-  .chip-pending { background: rgba(100, 116, 139, 0.15); color: #94a3b8; border-color: #475569; }
-  .chip-configured { background: rgba(234, 179, 8, 0.15); color: #fde047; border-color: #713f12; }
-  .chip-processed { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border-color: #065f46; }
-  .chip-error { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-color: #7f1d1d; }
-  .chip-skipped { background: rgba(156, 163, 175, 0.15); color: #9ca3af; border-color: #374151; }
+  .actions-bar {
+    position: sticky; bottom: 0; background: var(--bg-card); border-top: 1px solid var(--border);
+    padding: 14px 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 20px; border-radius: var(--radius); box-shadow: var(--shadow);
+  }
 
-  /* Editor */
-  .editor-page { display: flex; flex-direction: column; height: calc(100vh - 61px); }
-  .editor-header { background: #1e293b; border-bottom: 1px solid #334155; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .editor-main { flex: 1; display: flex; overflow: hidden; }
-  .editor-preview { flex: 1; overflow: auto; padding: 20px; background: #020617; display: flex; justify-content: center; align-items: flex-start; }
-  .editor-sidebar { width: 340px; background: #1e293b; border-left: 1px solid #334155; overflow-y: auto; padding: 16px; flex-shrink: 0; }
-  .pdf-stage { position: relative; background: white; border-radius: 4px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4); }
-  .pdf-canvas { display: block; cursor: crosshair; border-radius: 4px; }
-  .overlay { position: absolute; pointer-events: none; border: 2px solid #3b82f6; background: rgba(59, 130, 246, 0.15); border-radius: 3px; box-shadow: 0 0 0 1px white; }
-  .overlay.panel { border-style: dashed; border-color: #8b5cf6; background: rgba(139, 92, 246, 0.1); }
-  .overlay-label { position: absolute; top: -22px; left: 0; background: #3b82f6; color: white; font-size: 10px; padding: 2px 6px; border-radius: 3px; white-space: nowrap; font-weight: 600; }
-  .overlay.panel .overlay-label { background: #8b5cf6; }
+  /* === Editor === */
+  .editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .editor-top {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: nowrap;
+  }
+  .editor-file { flex: 1; min-width: 0; }
+  .editor-file-name {
+    font-weight: 600;
+    font-size: 15px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .editor-progress { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .progress-thin { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+  .progress-thin > div { height: 100%; background: linear-gradient(90deg, var(--accent), #60a5fa); transition: width 0.3s; }
 
-  .preset-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; aspect-ratio: 5/3.5; }
-  .preset-cell { background: #0f172a; border: 1px solid #334155; border-radius: 4px; cursor: pointer; transition: all 0.1s; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 10px; font-weight: 600; }
-  .preset-cell:hover { background: #1e293b; color: #e2e8f0; }
-  .preset-cell.active { background: linear-gradient(135deg, #3b82f6, #8b5cf6); border-color: #3b82f6; color: white; }
+  .editor-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
 
-  .section { margin-bottom: 16px; }
-  .section-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .pdf-area {
+    flex: 1;
+    overflow: auto;
+    background: var(--bg-soft);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 20px;
+    position: relative;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pdf-frame {
+    background: white;
+    box-shadow: var(--shadow-lg);
+    border-radius: 4px;
+    position: relative;
+    transition: opacity 0.15s;
+    touch-action: manipulation;
+  }
+  .pdf-frame canvas { display: block; cursor: crosshair; border-radius: 4px; }
+  .pdf-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.85); border-radius: 4px; }
 
-  .kbd { display: inline-block; padding: 1px 6px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; font-family: ui-monospace, monospace; font-size: 10px; color: #94a3b8; }
+  .instruction-banner {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--bg);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    z-index: 5;
+    animation: slideDown 0.3s ease-out;
+    pointer-events: none;
+  }
+  @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-  .progress-bar { height: 4px; background: #334155; border-radius: 999px; overflow: hidden; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); transition: width 0.3s; }
+  /* Tab + panel overlay preview */
+  .overlay { position: absolute; pointer-events: none; border-radius: 3px; }
+  .overlay-tab {
+    background: var(--accent);
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    animation: placeDrop 0.25s ease-out;
+  }
+  .overlay-panel {
+    background: rgba(37, 99, 235, 0.08);
+    border: 2px dashed rgba(37, 99, 235, 0.5);
+    animation: fadeIn 0.3s ease-out;
+  }
+  .overlay-panel-label { position: absolute; top: 4px; left: 8px; font-size: 10px; font-weight: 600; color: var(--accent-dark); background: white; padding: 2px 6px; border-radius: 4px; }
+  @keyframes placeDrop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-  .template-item { padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; font-size: 12px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-  .template-item .tpl-apply { cursor: pointer; color: #60a5fa; flex: 1; }
-  .template-item .tpl-apply:hover { color: #93c5fd; }
+  /* Floating PDF controls */
+  .pdf-controls {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    gap: 6px;
+    background: var(--bg-card);
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+    z-index: 4;
+  }
+  .pdf-controls button {
+    width: 34px; height: 34px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    border-radius: 6px;
+  }
+  .pdf-controls button:hover:not(:disabled) { background: var(--bg-soft); }
+  .pdf-controls .zoom-label { padding: 0 8px; align-self: center; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 
-  .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 12px 18px; border-radius: 10px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5); font-size: 13px; z-index: 1000; animation: slideIn 0.2s; }
-  @keyframes slideIn { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  /* Page navigator for multi-page */
+  .page-nav {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 6px;
+    background: var(--bg-card);
+    padding: 6px 8px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    z-index: 4;
+    align-items: center;
+    font-size: 13px;
+  }
+  .page-nav button {
+    width: 30px; height: 30px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    border-radius: 6px;
+  }
+  .page-nav button:hover:not(:disabled) { background: var(--bg-soft); }
+  .page-nav-label { padding: 0 8px; font-variant-numeric: tabular-nums; color: var(--text-muted); }
 
-  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  /* Sidebar (desktop) */
+  .sidebar {
+    width: 360px;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    flex-shrink: 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .sidebar-title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+  }
+  .sidebar-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+
+  .placed-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--success-soft);
+    color: #15803d;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    width: fit-content;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .secondary-actions { display: flex; gap: 8px; }
+  .secondary-actions > * { flex: 1; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text);
+    color: var(--bg);
+    padding: 12px 20px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    animation: toastIn 0.2s ease-out;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+  /* Spinner */
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2.5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .shortcut-hint { font-size: 11px; color: #64748b; margin-top: 6px; }
-
-  .modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-  .modal { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 20px; max-width: 500px; width: 90%; }
-
+  /* Mobile layout */
   @media (max-width: 900px) {
-    .editor-main { flex-direction: column; }
-    .editor-sidebar { width: 100%; border-left: none; border-top: 1px solid #334155; max-height: 50vh; }
-    .file-row { grid-template-columns: 30px 1fr 80px 80px; }
-    .file-row > :nth-child(4) { display: none; }
+    .editor-body { flex-direction: column; overflow-y: auto; }
+    .pdf-area { min-height: 55vh; max-height: 55vh; padding: 12px; }
+    .sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); padding: 20px 18px; gap: 16px; }
+    .sidebar-footer { position: sticky; bottom: 0; background: var(--bg-card); margin: 0 -18px -20px; padding: 14px 18px; border-top: 1px solid var(--border); }
+    .brand-name { display: none; }
+    .editor-top { padding: 10px 12px; }
+    .editor-file-name { font-size: 14px; }
+    .pdf-controls { top: 10px; right: 10px; }
+    .pdf-controls button { width: 32px; height: 32px; }
+    .page-nav { bottom: 10px; }
+    .upload-title { font-size: 32px; }
+    .list-title { font-size: 26px; }
+    .file-row { padding: 12px 14px; gap: 10px; }
+    .file-meta { display: none; }
   }
+
+  @media (max-width: 500px) {
+    .stats-row { gap: 6px; }
+    .stat { padding: 6px 10px; font-size: 12px; }
+    .secondary-actions { flex-direction: column; }
+    .secondary-actions > * { width: 100%; }
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-subtle); }
 </style>
 </head>
 <body>
@@ -132,77 +435,44 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// =========================================================================
+// ================================================================
 // API
-// =========================================================================
+// ================================================================
 const API = "";
 const api = {
   upload: async (files) => {
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
     const r = await fetch(`${API}/api/files/upload`, { method: "POST", body: fd });
-    if (!r.ok) throw new Error(`Upload failed: ${r.status}`);
+    if (!r.ok) throw new Error("Upload failed");
     return r.json();
   },
   list: async (params = {}) => {
     const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([_, v]) => v))).toString();
-    const r = await fetch(`${API}/api/files${qs ? "?" + qs : ""}`);
-    return r.json();
+    return (await fetch(`${API}/api/files${qs ? "?" + qs : ""}`)).json();
   },
   stats: async () => (await fetch(`${API}/api/files/stats`)).json(),
   get: async (id) => (await fetch(`${API}/api/files/${id}`)).json(),
-  updateConfig: async (id, cfg) => {
-    const r = await fetch(`${API}/api/files/${id}/config`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cfg),
-    });
-    return r.json();
-  },
-  skip: async (id, skip = true) => {
-    const r = await fetch(`${API}/api/files/${id}/skip`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ skip }),
-    });
-    return r.json();
-  },
+  updateConfig: async (id, cfg) => (await fetch(`${API}/api/files/${id}/config`, {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cfg),
+  })).json(),
+  skip: async (id) => fetch(`${API}/api/files/${id}/skip`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ skip: true }),
+  }),
   delete: async (id) => fetch(`${API}/api/files/${id}`, { method: "DELETE" }),
-  bulkApply: async (fileIds, config) => {
-    const r = await fetch(`${API}/api/files/bulk-apply`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_ids: fileIds, config }),
-    });
-    return r.json();
-  },
-  bulkDelete: async (fileIds) => {
-    const r = await fetch(`${API}/api/files/bulk-delete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_ids: fileIds, config: {} }),
-    });
-    return r.json();
-  },
-  listTemplates: async () => (await fetch(`${API}/api/templates`)).json(),
-  createTemplate: async (name, config) => {
-    const r = await fetch(`${API}/api/templates`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, config }),
-    });
-    return r.json();
-  },
-  deleteTemplate: async (id) => fetch(`${API}/api/templates/${id}`, { method: "DELETE" }),
+  bulkDelete: async (ids) => fetch(`${API}/api/files/bulk-delete`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_ids: ids, config: {} }),
+  }),
   reset: async () => fetch(`${API}/api/reset`, { method: "POST" }),
   previewUrl: (id) => `${API}/api/files/${id}/preview`,
   downloadUrl: (id) => `${API}/api/files/${id}/download`,
   downloadAllUrl: () => `${API}/api/download-all`,
 };
 
-// =========================================================================
-// Layout math (must mirror backend exactly)
-// =========================================================================
+// ================================================================
+// Layout math (MUST mirror backend)
+// ================================================================
 function computeLayout(clickX, clickY, pageW, pageH, panelHHint = 140) {
   const tabW = Math.min(220, pageW - 40);
   const tabH = 36;
@@ -218,144 +488,176 @@ function computeLayout(clickX, clickY, pageW, pageH, panelHHint = 140) {
   return { tabX, tabY, tabW, tabH, panelX, panelY, panelW, panelH };
 }
 
-const PRESETS = ["TL","TC","TR","CL","CC","CR","BL","BC","BR"];
-function presetToClick(preset, W, H) {
-  const xs = { L: 120, C: W / 2, R: W - 120 };
-  const ys = { T: H - 60, C: H / 2, B: 60 };
-  return { x: xs[preset[1]], y: ys[preset[0]] };
-}
-
-// =========================================================================
-// Toast helper
-// =========================================================================
-const ToastContext = React.createContext(() => {});
-function ToastProvider({ children }) {
-  const [toast, setToast] = useState(null);
-  const show = useCallback((msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2200);
-  }, []);
+// ================================================================
+// Toast
+// ================================================================
+const ToastCtx = React.createContext(() => {});
+function ToastHost({ children }) {
+  const [msg, setMsg] = useState(null);
+  const show = useCallback(m => { setMsg(m); setTimeout(() => setMsg(null), 2000); }, []);
   return (
-    <ToastContext.Provider value={show}>
+    <ToastCtx.Provider value={show}>
       {children}
-      {toast && <div className="toast">{toast}</div>}
-    </ToastContext.Provider>
+      {msg && <div className="toast">{msg}</div>}
+    </ToastCtx.Provider>
   );
 }
-const useToast = () => React.useContext(ToastContext);
+const useToast = () => React.useContext(ToastCtx);
 
-// =========================================================================
-// PDF Canvas with overlay
-// =========================================================================
-function PdfCanvas({ fileId, pageIndex, onPageInfo, onClick, tabClick, config }) {
+// ================================================================
+// PDF Preview with zoom + click placement
+// ================================================================
+function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onClick, tabClick, needsClick }) {
   const canvasRef = useRef(null);
-  const [dims, setDims] = useState({ w: 0, h: 0, pdfW: 0, pdfH: 0, scale: 1 });
+  const wrapperRef = useRef(null);
+  const [fitScale, setFitScale] = useState(1);
+  const [zoom, setZoom] = useState(1);
+  const [dims, setDims] = useState({ w: 0, h: 0, pdfW: 612, pdfH: 792 });
   const [loading, setLoading] = useState(true);
   const renderTaskRef = useRef(null);
   const docRef = useRef(null);
 
+  // Load PDF doc
   useEffect(() => {
     if (!fileId) return;
     let cancelled = false;
     setLoading(true);
+    docRef.current = null;
     (async () => {
       try {
         const task = pdfjsLib.getDocument(api.previewUrl(fileId));
         const pdf = await task.promise;
         if (cancelled) return;
         docRef.current = pdf;
-        onPageInfo && onPageInfo({ numPages: pdf.numPages });
-      } catch (e) { console.error(e); }
+        onPageChange && onPageChange({ numPages: pdf.numPages });
+        renderPage();
+      } catch (e) { console.error(e); setLoading(false); }
     })();
     return () => { cancelled = true; };
   }, [fileId]);
 
-  useEffect(() => {
-    if (!docRef.current) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const pdf = docRef.current;
-        const idx = Math.min(pageIndex, pdf.numPages - 1);
-        const page = await pdf.getPage(idx + 1);
-        if (cancelled) return;
-        const baseViewport = page.getViewport({ scale: 1 });
-        const containerW = canvasRef.current?.parentElement?.clientWidth || 800;
-        const targetW = Math.min(900, containerW - 4);
-        const fitScale = targetW / baseViewport.width;
-        const viewport = page.getViewport({ scale: fitScale });
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const dpr = window.devicePixelRatio || 1;
-        canvas.width = viewport.width * dpr;
-        canvas.height = viewport.height * dpr;
-        canvas.style.width = viewport.width + "px";
-        canvas.style.height = viewport.height + "px";
-        const ctx = canvas.getContext("2d");
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        if (renderTaskRef.current) { try { renderTaskRef.current.cancel(); } catch {} }
-        const rt = page.render({ canvasContext: ctx, viewport });
-        renderTaskRef.current = rt;
-        await rt.promise;
-        if (cancelled) return;
-        setDims({ w: viewport.width, h: viewport.height, pdfW: baseViewport.width, pdfH: baseViewport.height, scale: fitScale });
-        setLoading(false);
-      } catch (e) {
-        if (e.name !== "RenderingCancelledException") console.error(e);
-      }
-    })();
-  }, [fileId, pageIndex, docRef.current]);
+  const renderPage = useCallback(async () => {
+    const pdf = docRef.current;
+    if (!pdf || !canvasRef.current || !wrapperRef.current) return;
+    try {
+      const idx = Math.min(pageIndex, pdf.numPages - 1);
+      const page = await pdf.getPage(idx + 1);
+      const baseViewport = page.getViewport({ scale: 1 });
 
+      // Measure the wrapper's parent (pdf-area) to get available space
+      const area = wrapperRef.current.parentElement;
+      const availableW = area.clientWidth - 40;
+      const availableH = area.clientHeight - 40;
+      const fitW = availableW / baseViewport.width;
+      const fitH = availableH / baseViewport.height;
+      const fit = Math.min(fitW, fitH, 1.8);
+      const actualScale = fit * zoom;
+
+      const viewport = page.getViewport({ scale: actualScale });
+      const canvas = canvasRef.current;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = viewport.width * dpr;
+      canvas.height = viewport.height * dpr;
+      canvas.style.width = viewport.width + "px";
+      canvas.style.height = viewport.height + "px";
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (renderTaskRef.current) { try { renderTaskRef.current.cancel(); } catch {} }
+      const rt = page.render({ canvasContext: ctx, viewport });
+      renderTaskRef.current = rt;
+      await rt.promise;
+
+      setFitScale(fit);
+      setDims({ w: viewport.width, h: viewport.height, pdfW: baseViewport.width, pdfH: baseViewport.height });
+      setLoading(false);
+    } catch (e) {
+      if (e.name !== "RenderingCancelledException") { console.error(e); setLoading(false); }
+    }
+  }, [pageIndex, zoom]);
+
+  useEffect(() => { renderPage(); }, [pageIndex, zoom, renderPage]);
+
+  // Re-render on window resize
+  useEffect(() => {
+    const onResize = () => renderPage();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [renderPage]);
+
+  // Click handler
   const handleClick = (e) => {
-    if (!canvasRef.current || !dims.scale) return;
+    if (!canvasRef.current || !dims.w) return;
     const rect = canvasRef.current.getBoundingClientRect();
     const cx = e.clientX - rect.left;
     const cy = e.clientY - rect.top;
-    const pdfX = cx / dims.scale;
-    const pdfY = (dims.h - cy) / dims.scale;
+    const actualScale = fitScale * zoom;
+    const pdfX = cx / actualScale;
+    const pdfY = (dims.h - cy) / actualScale;
     onClick && onClick({ x: pdfX, y: pdfY });
   };
 
+  // Build overlay
   let overlay = null;
   if (tabClick && dims.pdfW) {
+    const actualScale = fitScale * zoom;
     const layout = computeLayout(tabClick.x, tabClick.y, dims.pdfW, dims.pdfH);
     const toCss = (r) => ({
-      left: r.x * dims.scale,
-      top: (dims.pdfH - (r.y + r.h)) * dims.scale,
-      width: r.w * dims.scale,
-      height: r.h * dims.scale,
+      position: "absolute",
+      left: r.x * actualScale,
+      top: (dims.pdfH - (r.y + r.h)) * actualScale,
+      width: r.w * actualScale,
+      height: r.h * actualScale,
     });
     const tabCss = toCss({ x: layout.tabX, y: layout.tabY, w: layout.tabW, h: layout.tabH });
     const panelCss = toCss({ x: layout.panelX, y: layout.panelY, w: layout.panelW, h: layout.panelH });
     overlay = (
       <>
-        <div className="overlay panel" style={panelCss}>
-          <div className="overlay-label">Hidden panel</div>
+        <div className="overlay overlay-panel" style={panelCss}>
+          <div className="overlay-panel-label">Hidden text appears here</div>
         </div>
-        <div className="overlay" style={tabCss}>
-          <div className="overlay-label">Tab</div>
-        </div>
+        <div className="overlay overlay-tab" style={tabCss}>Tab</div>
       </>
     );
   }
 
+  const canZoomOut = zoom > 0.5;
+  const canZoomIn = zoom < 3;
+
   return (
-    <div className="pdf-stage">
-      <canvas ref={canvasRef} className="pdf-canvas" onClick={handleClick} />
-      {loading && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.9)", borderRadius: 4 }}>
-          <div className="spinner" />
+    <>
+      <div className="pdf-controls">
+        <button onClick={() => setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))} disabled={!canZoomOut} title="Zoom out">−</button>
+        <div className="zoom-label">{Math.round(fitScale * zoom * 100)}%</div>
+        <button onClick={() => setZoom(z => Math.min(3, +(z + 0.25).toFixed(2)))} disabled={!canZoomIn} title="Zoom in">+</button>
+        <button onClick={() => setZoom(1)} title="Fit to screen" style={{ fontSize: 13 }}>⤢</button>
+      </div>
+
+      {needsClick && !loading && (
+        <div className="instruction-banner">👇 Tap anywhere on the page to place your tab</div>
+      )}
+
+      <div ref={wrapperRef} className="pdf-frame" style={{ opacity: loading ? 0.4 : 1 }}>
+        <canvas ref={canvasRef} onClick={handleClick} />
+        {overlay}
+        {loading && <div className="pdf-loading"><div className="spinner" /></div>}
+      </div>
+
+      {numPages > 1 && (
+        <div className="page-nav">
+          <button onClick={() => onPageChange({ pageIndex: Math.max(0, pageIndex - 1) })} disabled={pageIndex === 0}>‹</button>
+          <span className="page-nav-label">Page {pageIndex + 1} of {numPages}</span>
+          <button onClick={() => onPageChange({ pageIndex: Math.min(numPages - 1, pageIndex + 1) })} disabled={pageIndex >= numPages - 1}>›</button>
         </div>
       )}
-      {overlay}
-    </div>
+    </>
   );
 }
 
-// =========================================================================
-// Upload Screen
-// =========================================================================
-function UploadScreen({ onUploaded }) {
+// ================================================================
+// Upload screen
+// ================================================================
+function UploadScreen({ onDone, initialFiles }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
@@ -364,29 +666,28 @@ function UploadScreen({ onUploaded }) {
 
   const doUpload = async (fileList) => {
     const files = Array.from(fileList).filter(f => /\.(pdf|docx)$/i.test(f.name));
-    if (!files.length) { toast("No PDF or DOCX files found"); return; }
+    if (!files.length) { toast("No PDF or Word files found"); return; }
     setUploading(true);
     setProgress({ done: 0, total: files.length });
-    // Upload in batches of 10 to avoid huge single requests
     const BATCH = 10;
     for (let i = 0; i < files.length; i += BATCH) {
-      const batch = files.slice(i, i + BATCH);
-      try {
-        await api.upload(batch);
-      } catch (e) { console.error(e); toast("Batch upload error"); }
+      try { await api.upload(files.slice(i, i + BATCH)); }
+      catch (e) { console.error(e); }
       setProgress({ done: Math.min(i + BATCH, files.length), total: files.length });
     }
     setUploading(false);
-    toast(`Uploaded ${files.length} file${files.length === 1 ? "" : "s"}`);
-    onUploaded();
+    toast(`Added ${files.length} file${files.length === 1 ? "" : "s"}`);
+    onDone();
   };
 
   return (
     <div className="upload-page">
-      <h1 className="h1">Upload documents</h1>
-      <p className="muted" style={{ marginBottom: 24 }}>
-        Drop PDFs and Word docs. DOCX files are converted to PDF on the server with full formatting preserved.
-      </p>
+      <div className="upload-hero">
+        <h1 className="upload-title">
+          Add a <em>hidden tab</em><br/>to your documents
+        </h1>
+        <p className="upload-sub">Upload PDFs or Word docs. Click where you want the tab.<br/>Download the finished files.</p>
+      </div>
 
       <div
         className={"drop-zone" + (dragging ? " dragging" : "")}
@@ -398,189 +699,140 @@ function UploadScreen({ onUploaded }) {
         {uploading ? (
           <>
             <div className="drop-icon"><div className="spinner" style={{ width: 32, height: 32 }} /></div>
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>Uploading... {progress.done} / {progress.total}</div>
-            <div className="progress-bar" style={{ maxWidth: 400, margin: "0 auto" }}>
-              <div className="progress-fill" style={{ width: (progress.done / progress.total * 100) + "%" }} />
-            </div>
+            <div className="drop-heading">Uploading {progress.done} of {progress.total}...</div>
+            <div className="drop-sub">Word docs take a few seconds each to convert</div>
           </>
         ) : (
           <>
-            <div className="drop-icon">📄</div>
-            <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 6, color: "#f1f5f9" }}>
-              Drop files or click to browse
-            </div>
-            <div className="muted">PDF and DOCX · Handles 900+ files · Uploads in batches</div>
+            <div className="drop-icon">📁</div>
+            <div className="drop-heading">Drop files here or tap to choose</div>
+            <div className="drop-sub">PDF and Word · Up to hundreds of files</div>
           </>
         )}
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf,.docx"
-          style={{ display: "none" }}
-          onChange={(e) => doUpload(e.target.files)}
-        />
+        <input ref={inputRef} type="file" multiple accept=".pdf,.docx" style={{ display: "none" }} onChange={(e) => doUpload(e.target.files)} />
       </div>
 
-      <div className="info-box" style={{ marginTop: 20 }}>
-        <b>Keyboard power:</b> In the editor, use <span className="kbd">1</span>–<span className="kbd">9</span> for position presets,
-        <span className="kbd"> Enter</span> to save and advance, <span className="kbd">→</span> / <span className="kbd">←</span> to navigate,
-        <span className="kbd"> S</span> to skip, <span className="kbd">T</span> to focus tab label, <span className="kbd">H</span> for hidden text.
+      <div className="help-note">
+        <b>How it works.</b> For each document, tap where the tab should go, type what should show when someone clicks it, and hit save. When you're done, download everything as one zip.
       </div>
+
+      {initialFiles > 0 && (
+        <div style={{ marginTop: 16, textAlign: "center" }}>
+          <button className="btn-ghost" onClick={onDone}>← Back to my {initialFiles} files</button>
+        </div>
+      )}
     </div>
   );
 }
 
-// =========================================================================
-// File List Screen
-// =========================================================================
-function StatsStrip({ stats }) {
-  if (!stats) return null;
-  const by = stats.by_status || {};
-  return (
-    <div className="stats-strip">
-      <div className="stat-pill"><b>{stats.total || 0}</b> total</div>
-      <div className="stat-pill"><span className="stat-dot dot-pending"/> {by.pending || 0} pending</div>
-      <div className="stat-pill"><span className="stat-dot dot-configured"/> {by.configured || 0} processing</div>
-      <div className="stat-pill"><span className="stat-dot dot-processed"/> {by.processed || 0} done</div>
-      {by.error ? <div className="stat-pill"><span className="stat-dot dot-error"/> {by.error} error</div> : null}
-      {by.skipped ? <div className="stat-pill"><span className="stat-dot dot-skipped"/> {by.skipped} skipped</div> : null}
-    </div>
-  );
-}
-
-function FileListScreen({ files, stats, onEdit, onRefresh, onUpload, onBulkDelete, onResetAll }) {
+// ================================================================
+// File list
+// ================================================================
+function FileListScreen({ files, stats, onEdit, onUpload, onRefresh, onReset }) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState(new Set());
   const toast = useToast();
 
-  const filtered = useMemo(() => {
-    return files.filter(f => {
-      if (search && !f.original_name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (statusFilter && f.status !== statusFilter) return false;
-      return true;
-    });
-  }, [files, search, statusFilter]);
+  const filtered = useMemo(() =>
+    files.filter(f => !search || f.original_name.toLowerCase().includes(search.toLowerCase())),
+  [files, search]);
 
   const firstPending = files.findIndex(f => f.status === "pending" || f.status === "configured");
-  const toggleSelect = (id) => setSelected(prev => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    return next;
-  });
-  const selectAll = () => setSelected(new Set(filtered.map(f => f.id)));
-  const clearSelection = () => setSelected(new Set());
+  const by = stats?.by_status || {};
+  const done = by.processed || 0;
+  const inProgress = by.configured || 0;
+  const pending = by.pending || 0;
 
-  const handleBulkDelete = async () => {
+  const toggleSel = (id) => setSelected(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const bulkDel = async () => {
     if (!selected.size) return;
-    if (!confirm(`Delete ${selected.size} files?`)) return;
-    await onBulkDelete(Array.from(selected));
-    clearSelection();
+    if (!confirm(`Remove ${selected.size} files?`)) return;
+    await api.bulkDelete(Array.from(selected));
+    setSelected(new Set());
+    await onRefresh();
+    toast("Removed");
   };
 
-  const downloadAll = () => { window.location.href = api.downloadAllUrl(); };
+  const statusText = (s) => ({
+    pending: "Not started",
+    configured: "Processing…",
+    processed: "Done",
+    error: "Error",
+    skipped: "Skipped",
+  }[s] || s);
 
   return (
-    <div className="file-list-page">
-      <div style={{ marginBottom: 16 }}>
-        <StatsStrip stats={stats} />
+    <div className="list-page">
+      <div className="list-header">
+        <div>
+          <h1 className="list-title">Your documents</h1>
+          <div className="list-count">{files.length} file{files.length === 1 ? "" : "s"}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="btn-secondary" onClick={onUpload}>＋ Add more</button>
+          {done > 0 && <a className="btn-accent" href={api.downloadAllUrl()} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>↓ Download {done} done</a>}
+          {firstPending >= 0 && <button className="btn-primary" onClick={() => onEdit(files[firstPending].id)}>{done > 0 ? "Continue →" : "Start →"}</button>}
+        </div>
+      </div>
+
+      <div className="stats-row">
+        {pending > 0 && <div className="stat"><span className="stat-dot dot-pending"/> {pending} to do</div>}
+        {inProgress > 0 && <div className="stat"><span className="stat-dot dot-processing"/> {inProgress} processing</div>}
+        {done > 0 && <div className="stat"><span className="stat-dot dot-done"/> {done} done</div>}
+        {by.error > 0 && <div className="stat"><span className="stat-dot dot-error"/> {by.error} error</div>}
       </div>
 
       <div className="toolbar">
-        <div className="search">
+        <div className="search-wrap">
           <span className="search-icon">🔍</span>
-          <input className="input" placeholder="Search filename..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="input" placeholder="Search files..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <select className="input" style={{ width: 150 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="pending">Pending</option>
-          <option value="configured">Processing</option>
-          <option value="processed">Done</option>
-          <option value="error">Error</option>
-          <option value="skipped">Skipped</option>
-        </select>
-        <div style={{ flex: 1 }} />
-        <button className="btn-secondary" onClick={onUpload}>+ Add files</button>
-        {firstPending >= 0 && (
-          <button className="btn-primary" onClick={() => onEdit(files[firstPending].id)}>
-            {stats?.by_status?.processed > 0 ? "Continue →" : "Start →"}
-          </button>
-        )}
-        {(stats?.by_status?.processed || 0) > 0 && (
-          <button className="btn-success" onClick={downloadAll}>
-            ⬇ Download {stats.by_status.processed} done
-          </button>
-        )}
+        {selected.size > 0 && <button className="btn-secondary" onClick={bulkDel} style={{ color: "#991b1b", borderColor: "#fca5a5" }}>Remove {selected.size}</button>}
       </div>
 
-      {selected.size > 0 && (
-        <div className="toolbar" style={{ background: "rgba(59, 130, 246, 0.1)", padding: 10, borderRadius: 8, border: "1px solid rgba(59, 130, 246, 0.3)" }}>
-          <span style={{ fontSize: 13 }}><b>{selected.size}</b> selected</span>
-          <button className="btn-ghost" onClick={clearSelection}>Clear</button>
-          <div style={{ flex: 1 }} />
-          <button className="btn-danger" onClick={handleBulkDelete}>Delete selected</button>
-        </div>
-      )}
-
       {files.length === 0 ? (
-        <div className="info-box" style={{ textAlign: "center", padding: 40 }}>
-          No files yet. <button className="btn-primary" style={{ marginLeft: 8 }} onClick={onUpload}>Upload some</button>
+        <div className="file-grid" style={{ padding: 40, textAlign: "center" }}>
+          <div style={{ fontSize: 40, marginBottom: 10 }}>📭</div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>No files yet</div>
+          <div style={{ color: "var(--text-muted)", marginBottom: 16, fontSize: 14 }}>Upload some PDFs or Word docs to get started.</div>
+          <button className="btn-primary" onClick={onUpload}>＋ Upload</button>
         </div>
       ) : (
-        <div className="file-table">
-          <div className="file-row header">
-            <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0} onChange={selected.size === filtered.length ? clearSelection : selectAll} />
-            <div>Name</div>
-            <div>Status</div>
-            <div>Pages</div>
-            <div>Actions</div>
-          </div>
+        <div className="file-grid">
           {filtered.map(f => (
-            <div
-              key={f.id}
-              className={"file-row" + (selected.has(f.id) ? " selected" : "")}
-              onClick={(e) => {
-                if (e.target.tagName === "INPUT" || e.target.tagName === "BUTTON" || e.target.tagName === "A") return;
-                onEdit(f.id);
-              }}
-            >
-              <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelect(f.id)} onClick={e => e.stopPropagation()} />
-              <div className="filename" title={f.original_name}>
-                <span style={{ marginRight: 6 }}>{f.kind === "docx" ? "📝" : "📄"}</span>
-                {f.original_name}
+            <div key={f.id} className={"file-row" + (f.status === "processed" ? " done" : "")} onClick={() => onEdit(f.id)}>
+              <div className={"file-check" + (selected.has(f.id) ? " checked" : "")} onClick={(e) => { e.stopPropagation(); toggleSel(f.id); }}>
+                {selected.has(f.id) && "✓"}
               </div>
-              <div><span className={"chip chip-" + f.status}>{f.status}</span></div>
-              <div className="file-pages">{f.page_count}</div>
-              <div style={{ display: "flex", gap: 4 }}>
-                <button className="btn-ghost" style={{ padding: "4px 8px", fontSize: 11 }} onClick={(e) => { e.stopPropagation(); onEdit(f.id); }}>Edit</button>
-                {f.has_processed && (
-                  <a href={api.downloadUrl(f.id)} className="btn-ghost" style={{ padding: "4px 8px", fontSize: 11, textDecoration: "none" }} onClick={e => e.stopPropagation()}>⬇</a>
-                )}
+              <span className="file-icon">{f.kind === "docx" ? "📝" : "📄"}</span>
+              <div className="file-info">
+                <div className="file-name" title={f.original_name}>{f.original_name}</div>
+                <div className="file-meta">{f.page_count} page{f.page_count === 1 ? "" : "s"}</div>
               </div>
+              <span className={"file-status status-" + f.status}>{statusText(f.status)}</span>
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ marginTop: 20, display: "flex", justifyContent: "flex-end" }}>
-        <button className="btn-ghost" style={{ color: "#991b1b" }} onClick={onResetAll}>Reset everything</button>
-      </div>
+      {files.length > 0 && (
+        <div style={{ marginTop: 24, display: "flex", justifyContent: "flex-end" }}>
+          <button className="btn-ghost" onClick={onReset} style={{ color: "#991b1b" }}>Reset everything</button>
+        </div>
+      )}
     </div>
   );
 }
 
-// =========================================================================
-// Editor Screen
-// =========================================================================
-function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh, templates, onTemplatesChanged }) {
+// ================================================================
+// Editor screen
+// ================================================================
+function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
   const toast = useToast();
   const [file, setFile] = useState(null);
   const [cfg, setCfg] = useState(null);
-  const [pageInfo, setPageInfo] = useState({ numPages: 1 });
+  const [numPages, setNumPages] = useState(1);
   const [saving, setSaving] = useState(false);
-  const labelRef = useRef(null);
-  const textRef = useRef(null);
 
   const currentIdx = files.findIndex(f => f.id === currentId);
   const total = files.length;
@@ -591,29 +843,48 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh, templat
     api.get(currentId).then(f => {
       if (cancelled) return;
       setFile(f);
-      setCfg(f.config || { page_index: 0, click_x: null, click_y: null, tab_label: "Show details", hidden_text: "" });
+      const hasClick = f.config?.click_x != null;
+      setCfg(f.config || {
+        page_index: 0,
+        click_x: null,
+        click_y: null,
+        tab_label: "Show details",
+        hidden_text: "",
+      });
     });
     return () => { cancelled = true; };
   }, [currentId]);
 
-  const pageW = file?.page_sizes?.[cfg?.page_index || 0]?.[0] || 612;
-  const pageH = file?.page_sizes?.[cfg?.page_index || 0]?.[1] || 792;
+  // Default tab placement to bottom-center the first time (so save always works)
+  useEffect(() => {
+    if (!file || !cfg) return;
+    if (cfg.click_x == null && file.page_sizes?.length) {
+      const [w, h] = file.page_sizes[cfg.page_index || 0] || [612, 792];
+      setCfg(c => ({ ...c, click_x: w / 2, click_y: 60 }));
+    }
+  }, [file, cfg?.page_index]);
 
   const updateCfg = (patch) => setCfg(prev => ({ ...prev, ...patch }));
 
-  const saveAndNext = async (advance = true) => {
-    if (!cfg || cfg.click_x == null) { toast("Click on the PDF to place the tab first"); return; }
+  const pageW = file?.page_sizes?.[cfg?.page_index || 0]?.[0] || 612;
+  const pageH = file?.page_sizes?.[cfg?.page_index || 0]?.[1] || 792;
+
+  const saveAndNext = async () => {
+    if (!cfg) return;
+    // Ensure there's always a placement
+    const finalCfg = { ...cfg };
+    if (finalCfg.click_x == null) {
+      finalCfg.click_x = pageW / 2;
+      finalCfg.click_y = 60;
+    }
     setSaving(true);
     try {
-      await api.updateConfig(currentId, cfg);
+      await api.updateConfig(currentId, finalCfg);
       onRefresh();
-      if (advance) {
-        const next = files[currentIdx + 1];
-        if (next) onNavigate(next.id);
-        else { toast("All done — back to list"); onBack(); }
-      } else {
-        toast("Saved");
-      }
+      toast("Saved ✓");
+      const next = files[currentIdx + 1];
+      if (next) onNavigate(next.id);
+      else { toast("All done!"); onBack(); }
     } catch (e) {
       toast("Save failed: " + e.message);
     } finally {
@@ -622,255 +893,174 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh, templat
   };
 
   const skip = async () => {
-    await api.skip(currentId, true);
+    await api.skip(currentId);
     onRefresh();
     const next = files[currentIdx + 1];
     if (next) onNavigate(next.id); else onBack();
   };
 
-  const applyPreset = (preset) => {
-    const { x, y } = presetToClick(preset, pageW, pageH);
-    updateCfg({ click_x: x, click_y: y });
-  };
-
   const copyFromPrev = () => {
     const prev = files[currentIdx - 1];
-    if (prev && prev.config) {
+    if (prev?.config) {
       const { page_index, ...rest } = prev.config;
-      updateCfg({ ...rest, page_index: 0 });
+      updateCfg({ ...rest });
       toast("Copied from previous");
     }
   };
 
-  const saveAsTemplate = async () => {
-    const name = prompt("Template name:");
-    if (!name) return;
-    await api.createTemplate(name, cfg);
-    onTemplatesChanged();
-    toast("Template saved");
-  };
-
-  const applyTemplate = (tpl) => {
-    const { page_index, ...rest } = tpl.config;
-    updateCfg({ ...rest });
-    toast("Applied: " + tpl.name);
-  };
-
-  // Keyboard shortcuts
+  // Keyboard shortcuts (hidden, for power users only)
   useEffect(() => {
-    const handler = (e) => {
-      const tag = document.activeElement?.tagName;
-      const inInput = tag === "INPUT" || tag === "TEXTAREA";
-      if (e.key === "Escape") { onBack(); return; }
-      if (inInput) return;
-      if (e.key === "Enter") { e.preventDefault(); saveAndNext(true); }
-      else if (e.key === "ArrowRight" && !e.shiftKey) { const n = files[currentIdx + 1]; if (n) onNavigate(n.id); }
-      else if (e.key === "ArrowLeft" && !e.shiftKey) { const p = files[currentIdx - 1]; if (p) onNavigate(p.id); }
-      else if (e.key >= "1" && e.key <= "9") { applyPreset(PRESETS[parseInt(e.key) - 1]); }
-      else if (e.key === "s" || e.key === "S") skip();
-      else if (e.key === "t" || e.key === "T") { e.preventDefault(); labelRef.current?.focus(); labelRef.current?.select(); }
-      else if (e.key === "h" || e.key === "H") { e.preventDefault(); textRef.current?.focus(); }
-      else if (e.key === "c" || e.key === "C") { copyFromPrev(); }
+    const h = (e) => {
+      const t = document.activeElement?.tagName;
+      if (t === "INPUT" || t === "TEXTAREA") return;
+      if (e.key === "Escape") onBack();
+      else if (e.key === "Enter") { e.preventDefault(); saveAndNext(); }
+      else if (e.key === "ArrowRight") { const n = files[currentIdx + 1]; if (n) onNavigate(n.id); }
+      else if (e.key === "ArrowLeft") { const p = files[currentIdx - 1]; if (p) onNavigate(p.id); }
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, [currentIdx, files, cfg, saving]);
 
   if (!file || !cfg) {
-    return <div style={{ padding: 60, textAlign: "center" }}><div className="spinner" /></div>;
+    return <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><div className="spinner" /></div>;
   }
 
-  const progressPct = files.filter(f => f.status === "processed").length / total * 100;
+  const processedCount = files.filter(f => f.status === "processed").length;
+  const progressPct = processedCount / total * 100;
+  const hasPlacement = cfg.click_x != null;
 
   return (
-    <div className="editor-page">
-      <div className="editor-header">
-        <button className="btn-ghost" onClick={onBack}>← List</button>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={file.original_name}>
-            {currentIdx + 1} / {total} · {file.original_name}
-          </div>
-          <div className="progress-bar" style={{ marginTop: 4 }}>
-            <div className="progress-fill" style={{ width: progressPct + "%" }} />
-          </div>
+    <div className="editor">
+      <div className="editor-top">
+        <button className="btn-ghost" onClick={onBack}>← Back</button>
+        <div className="editor-file">
+          <div className="editor-file-name" title={file.original_name}>{file.original_name}</div>
+          <div className="editor-progress">File {currentIdx + 1} of {total} · {processedCount} done</div>
+          <div className="progress-thin"><div style={{ width: progressPct + "%" }} /></div>
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          <button className="btn-ghost" onClick={() => { const p = files[currentIdx - 1]; if (p) onNavigate(p.id); }} disabled={currentIdx === 0}>←</button>
-          <button className="btn-ghost" onClick={() => { const n = files[currentIdx + 1]; if (n) onNavigate(n.id); }} disabled={currentIdx >= total - 1}>→</button>
-        </div>
+        <button className="btn-icon" onClick={() => { const p = files[currentIdx - 1]; if (p) onNavigate(p.id); }} disabled={currentIdx === 0} title="Previous">‹</button>
+        <button className="btn-icon" onClick={() => { const n = files[currentIdx + 1]; if (n) onNavigate(n.id); }} disabled={currentIdx >= total - 1} title="Next">›</button>
       </div>
 
-      <div className="editor-main">
-        <div className="editor-preview">
-          <PdfCanvas
+      <div className="editor-body">
+        <div className="pdf-area">
+          <PdfPreview
             fileId={file.id}
             pageIndex={cfg.page_index || 0}
-            onPageInfo={setPageInfo}
+            numPages={numPages}
+            onPageChange={(x) => { if (x.numPages) setNumPages(x.numPages); if (x.pageIndex != null) updateCfg({ page_index: x.pageIndex }); }}
             onClick={({ x, y }) => updateCfg({ click_x: x, click_y: y })}
-            tabClick={cfg.click_x != null ? { x: cfg.click_x, y: cfg.click_y } : null}
-            config={cfg}
+            tabClick={hasPlacement ? { x: cfg.click_x, y: cfg.click_y } : null}
+            needsClick={!hasPlacement}
           />
         </div>
 
-        <div className="editor-sidebar">
-          {pageInfo.numPages > 1 && (
-            <div className="section">
-              <div className="label">Page</div>
-              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                <button className="btn-ghost" onClick={() => updateCfg({ page_index: Math.max(0, (cfg.page_index || 0) - 1) })} disabled={(cfg.page_index || 0) === 0}>◀</button>
-                <div style={{ flex: 1, textAlign: "center", fontSize: 13 }}>{(cfg.page_index || 0) + 1} / {pageInfo.numPages}</div>
-                <button className="btn-ghost" onClick={() => updateCfg({ page_index: Math.min(pageInfo.numPages - 1, (cfg.page_index || 0) + 1) })} disabled={(cfg.page_index || 0) >= pageInfo.numPages - 1}>▶</button>
-              </div>
-            </div>
-          )}
-
-          <div className="section">
-            <div className="label">Position <span style={{ fontWeight: 400, textTransform: "none" }}>(keys <span className="kbd">1</span>–<span className="kbd">9</span>)</span></div>
-            <div className="preset-grid">
-              {PRESETS.map((p, i) => {
-                const isActive = cfg.click_x != null && (() => {
-                  const { x, y } = presetToClick(p, pageW, pageH);
-                  return Math.abs(cfg.click_x - x) < 1 && Math.abs(cfg.click_y - y) < 1;
-                })();
-                return (
-                  <div key={p} className={"preset-cell" + (isActive ? " active" : "")} onClick={() => applyPreset(p)}>{i + 1}</div>
-                );
-              })}
-            </div>
-            <div className="shortcut-hint">Or click directly on the PDF</div>
+        <div className="sidebar">
+          <div>
+            <h2 className="sidebar-title">Tab details</h2>
+            {hasPlacement && <div className="placed-indicator">✓ Tab placed · tap page to move</div>}
           </div>
 
-          <div className="section">
-            <label className="label">Tab label <span className="kbd">T</span></label>
-            <input ref={labelRef} className="input" value={cfg.tab_label} onChange={e => updateCfg({ tab_label: e.target.value })} />
+          <div>
+            <label className="label">What the button says</label>
+            <input className="input" value={cfg.tab_label} onChange={e => updateCfg({ tab_label: e.target.value })} placeholder="Show details" />
           </div>
 
-          <div className="section">
-            <label className="label">Hidden text <span className="kbd">H</span></label>
-            <textarea ref={textRef} className="textarea" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Text revealed when tab is clicked..." />
+          <div>
+            <label className="label">What appears when clicked</label>
+            <textarea className="textarea" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type the hidden message here..." />
           </div>
 
-          <div className="section" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <button className="btn-primary" onClick={() => saveAndNext(true)} disabled={saving || cfg.click_x == null}>
-              {saving ? "Saving..." : "Save & next"} <span className="kbd" style={{ marginLeft: 4 }}>↵</span>
-            </button>
-            <div style={{ display: "flex", gap: 4 }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => saveAndNext(false)} disabled={saving || cfg.click_x == null}>Save only</button>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={skip}>Skip <span className="kbd">S</span></button>
-            </div>
-            {currentIdx > 0 && (
-              <button className="btn-ghost" onClick={copyFromPrev}>↺ Copy from previous <span className="kbd">C</span></button>
-            )}
-            <button className="btn-ghost" onClick={saveAsTemplate}>💾 Save as template</button>
-          </div>
-
-          {templates.length > 0 && (
-            <div className="section">
-              <div className="section-title">Templates</div>
-              {templates.map(t => (
-                <div key={t.id} className="template-item">
-                  <span className="tpl-apply" onClick={() => applyTemplate(t)}>{t.name}</span>
-                  <button className="btn-ghost" style={{ padding: "2px 6px", fontSize: 11, color: "#991b1b" }} onClick={async () => { await api.deleteTemplate(t.id); onTemplatesChanged(); }}>✕</button>
-                </div>
-              ))}
-            </div>
+          {currentIdx > 0 && (
+            <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0 }}>↺ Copy from previous file</button>
           )}
 
           {file.error_msg && (
-            <div className="section">
-              <div className="info-box" style={{ background: "rgba(239, 68, 68, 0.08)", borderColor: "rgba(239, 68, 68, 0.3)", color: "#fca5a5" }}>
-                <b>Error:</b> {file.error_msg}
-              </div>
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: 12, fontSize: 13, color: "#991b1b" }}>
+              <b>Problem:</b> {file.error_msg}
             </div>
           )}
+
+          <div className="sidebar-footer">
+            <button className="btn-primary" onClick={saveAndNext} disabled={saving} style={{ width: "100%" }}>
+              {saving ? "Saving..." : (currentIdx < total - 1 ? "Save and continue →" : "Save and finish")}
+            </button>
+            <div className="secondary-actions">
+              <button className="btn-secondary" onClick={skip}>Skip this</button>
+              <button className="btn-secondary" onClick={onBack}>Back to list</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// =========================================================================
-// App
-// =========================================================================
+// ================================================================
+// App shell
+// ================================================================
 function App() {
-  const [phase, setPhase] = useState("list"); // 'upload', 'list', 'editor'
+  const [phase, setPhase] = useState("loading");
   const [files, setFiles] = useState([]);
   const [stats, setStats] = useState(null);
-  const [templates, setTemplates] = useState([]);
   const [currentId, setCurrentId] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    const [fl, st, tp] = await Promise.all([api.list(), api.stats(), api.listTemplates()]);
+    const [fl, st] = await Promise.all([api.list(), api.stats()]);
     setFiles(fl.files || []);
     setStats(st);
-    setTemplates(tp.templates || []);
-    setLoading(false);
+    return fl.files || [];
   }, []);
 
-  useEffect(() => { refresh(); }, []);
-
-  // Poll for status updates on processing files
   useEffect(() => {
-    const hasProcessing = files.some(f => f.status === "configured");
-    if (!hasProcessing) return;
-    const interval = setInterval(refresh, 1500);
-    return () => clearInterval(interval);
-  }, [files, refresh]);
+    refresh().then(fs => setPhase(fs.length === 0 ? "upload" : "list"));
+  }, []);
 
+  // Poll when anything is processing
   useEffect(() => {
-    if (!loading && files.length === 0 && phase === "list") setPhase("upload");
-  }, [loading, files.length]);
+    if (!files.some(f => f.status === "configured")) return;
+    const i = setInterval(refresh, 1500);
+    return () => clearInterval(i);
+  }, [files]);
 
   const goEdit = (id) => { setCurrentId(id); setPhase("editor"); };
+
   const resetAll = async () => {
-    if (!confirm("Delete ALL files, configs, and templates? Cannot be undone.")) return;
+    if (!confirm("Delete all files and start over? This can't be undone.")) return;
     await api.reset();
     await refresh();
     setPhase("upload");
   };
 
   return (
-    <ToastProvider>
+    <ToastHost>
       <div className="topbar">
         <div className="brand">
-          <span>📎 PDF Tab Builder</span>
-          <span className="brand-badge">PRO</span>
+          <div className="brand-mark">T</div>
+          <div className="brand-name">Tab Builder</div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          {phase !== "upload" && <button className="btn-ghost" onClick={() => setPhase("upload")}>+ Upload</button>}
-          {phase !== "list" && <button className="btn-ghost" onClick={() => setPhase("list")}>📋 Files</button>}
-        </div>
+        {phase !== "loading" && phase !== "editor" && (
+          <div style={{ display: "flex", gap: 8 }}>
+            {phase !== "list" && files.length > 0 && <button className="btn-ghost" onClick={() => setPhase("list")}>My files</button>}
+            {phase !== "upload" && <button className="btn-ghost" onClick={() => setPhase("upload")}>＋ Upload</button>}
+          </div>
+        )}
       </div>
 
-      {loading ? (
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div className="spinner" />
-        </div>
-      ) : phase === "upload" ? (
-        <UploadScreen onUploaded={() => { refresh(); setPhase("list"); }} />
-      ) : phase === "list" ? (
-        <FileListScreen
-          files={files}
-          stats={stats}
-          onEdit={goEdit}
-          onRefresh={refresh}
-          onUpload={() => setPhase("upload")}
-          onBulkDelete={async (ids) => { await api.bulkDelete(ids); refresh(); }}
-          onResetAll={resetAll}
-        />
-      ) : (
-        <EditorScreen
-          files={files}
-          currentId={currentId}
-          onNavigate={setCurrentId}
-          onBack={() => { refresh(); setPhase("list"); }}
-          onRefresh={refresh}
-          templates={templates}
-          onTemplatesChanged={refresh}
-        />
+      {phase === "loading" && (
+        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><div className="spinner" /></div>
       )}
-    </ToastProvider>
+      {phase === "upload" && (
+        <UploadScreen onDone={async () => { const fs = await refresh(); setPhase(fs.length === 0 ? "upload" : "list"); }} initialFiles={files.length} />
+      )}
+      {phase === "list" && (
+        <FileListScreen files={files} stats={stats} onEdit={goEdit} onUpload={() => setPhase("upload")} onRefresh={refresh} onReset={resetAll} />
+      )}
+      {phase === "editor" && currentId && (
+        <EditorScreen files={files} currentId={currentId} onNavigate={setCurrentId} onBack={async () => { await refresh(); setPhase("list"); }} onRefresh={refresh} />
+      )}
+    </ToastHost>
   );
 }
 
