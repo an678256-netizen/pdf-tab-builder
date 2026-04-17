@@ -61,11 +61,12 @@ def get_pdf_page_info(pdf_path: str):
     return len(reader.pages), sizes
 
 
-def _compute_layout(click_x, click_y, page_w, page_h, panel_w_hint=None, panel_h_hint=140):
-    """Given a click point in PDF coords, compute tab and panel rectangles."""
-    tab_w = min(220, page_w - 40)
-    tab_h = 36
-    panel_w = min(page_w - 40, panel_w_hint or 500)
+def _compute_layout(click_x, click_y, page_w, page_h, panel_w_hint=None, panel_h_hint=130):
+    """Given a click point in PDF coords, compute tab and panel rectangles.
+    MUST match the frontend computeLayout() in frontend.html."""
+    tab_w = min(140, page_w - 40)   # smaller tab — feels like a pin attached to a word
+    tab_h = 30
+    panel_w = min(page_w - 40, panel_w_hint or 460)
     panel_h = min(panel_h_hint, page_h - tab_h - 60)
 
     tab_x = click_x - tab_w / 2
@@ -194,7 +195,7 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
         NameObject("/S"): NameObject("/JavaScript"),
         NameObject("/JS"): create_string_object(toggle_js),
     })
-    btn_da = create_string_object("/Helv 13 Tf 1 1 1 rg")
+    btn_da = create_string_object("/Helv 11 Tf 1 1 1 rg")
 
     btn_field = DictionaryObject({
         NameObject("/Type"): NameObject("/Annot"),
