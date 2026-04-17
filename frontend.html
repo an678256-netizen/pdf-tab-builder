@@ -154,12 +154,12 @@
 
   .overlay { position: absolute; pointer-events: none; }
   .overlay-tab {
-    background: var(--accent);
+    background: white;
     border-radius: 3px;
-    border: 1px solid white;
-    box-shadow: 0 0 0 1px var(--accent), 0 1px 3px rgba(37, 99, 235, 0.5);
+    border: 1px solid rgba(55, 65, 81, 0.5);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 700;
+    color: #374151; font-weight: 700;
     animation: placeDrop 0.2s ease-out;
     z-index: 10;
   }
@@ -506,7 +506,7 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
         <div className="overlay overlay-panel" style={css(panelR)}>
           <div className="overlay-panel-label">Hidden message appears here</div>
         </div>
-        <div className="overlay overlay-tab" style={{ ...css(tabR), fontSize: tabFontSize, lineHeight: 1 }}>+</div>
+        <div className="overlay overlay-tab" style={{ ...css(tabR), fontSize: tabFontSize, lineHeight: 1 }}>v</div>
       </>
     );
   }
@@ -521,7 +521,7 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
       </div>
 
       {needsClick && !loading && (
-        <div className="instruction-banner">👇 Tap any word to add a hidden message on that line</div>
+        <div className="instruction-banner">👇 Tap any word — a small v tab will appear in the margin</div>
       )}
 
       <div ref={wrapperRef} className="pdf-frame" style={{ opacity: loading ? 0.4 : 1 }}>
@@ -595,7 +595,7 @@ function UploadScreen({ onDone, initialFiles }) {
         <input ref={inputRef} type="file" multiple accept=".pdf,.docx" style={{ display: "none" }} onChange={(e) => doUpload(e.target.files)} />
       </div>
       <div className="help-note">
-        <b>Heads up:</b> the tab is a tiny <code style={{background:"#dbeafe",color:"#1e40af",padding:"1px 6px",borderRadius:4}}>+</code> icon in the page's left margin. Click it in Adobe Acrobat Reader (free) to show/hide the message. Other viewers (Preview, browsers) won't show the hidden message at all, and the + button won't do anything.
+        <b>Heads up:</b> the tab is a tiny <code style={{background:"white",border:"1px solid #9ca3af",color:"#374151",padding:"0 5px",borderRadius:3,fontWeight:700}}>v</code> icon in the page's left margin. Click it in Adobe Acrobat Reader (free) to show/hide the message. Other viewers (Preview, browsers) won't show the hidden message at all, and the v button won't do anything.
       </div>
       {initialFiles > 0 && (
         <div style={{ marginTop: 16, textAlign: "center" }}>
@@ -876,7 +876,7 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
           )}
 
           <div className="compat-notice">
-            <b>The + button works in Adobe Acrobat Reader (free).</b> In Mac Preview or web browsers, the hidden message stays hidden but the + won't do anything.
+            <b>The v button works in Adobe Acrobat Reader (free).</b> In Mac Preview or web browsers, the hidden message stays hidden but the v won't do anything.
           </div>
 
           {file.error_msg && (
