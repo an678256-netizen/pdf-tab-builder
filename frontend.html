@@ -38,7 +38,6 @@
     --shadow: 0 4px 12px rgba(28, 27, 23, 0.06), 0 2px 4px rgba(28, 27, 23, 0.04);
     --shadow-lg: 0 12px 32px rgba(28, 27, 23, 0.10), 0 4px 8px rgba(28, 27, 23, 0.06);
   }
-
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.5; }
   #root { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
@@ -55,7 +54,7 @@
   .btn-secondary:hover:not(:disabled) { background: var(--bg-soft); }
   .btn-ghost { background: transparent; color: var(--text-muted); padding: 8px 14px; font-size: 14px; font-weight: 500; }
   .btn-ghost:hover:not(:disabled) { color: var(--text); background: var(--bg-soft); }
-  .btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); font-size: 16px; }
+  .btn-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); font-size: 16px; border-radius: var(--radius-sm); }
   .btn-icon:hover:not(:disabled) { background: var(--bg-soft); border-color: var(--border-strong); }
 
   .input, .textarea { width: 100%; padding: 12px 14px; background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-size: 15px; color: var(--text); font-family: inherit; transition: border-color 0.15s, box-shadow 0.15s; }
@@ -99,7 +98,7 @@
   .search-wrap input { padding-left: 40px; }
   .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-subtle); font-size: 14px; pointer-events: none; }
   .file-grid { background: var(--bg-card); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
-  .file-row { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
+  .file-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s; }
   .file-row:last-child { border-bottom: none; }
   .file-row:hover { background: var(--bg-soft); }
   .file-row.done { background: var(--success-soft); }
@@ -116,6 +115,8 @@
   .status-done { background: var(--success-soft); color: #15803d; }
   .status-error { background: #fee2e2; color: #991b1b; }
   .status-skipped { background: var(--bg-soft); color: var(--text-subtle); }
+  .file-dl-btn { width: 32px; height: 32px; border: 1px solid var(--border-strong); background: var(--bg-card); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; color: var(--text); font-size: 14px; flex-shrink: 0; }
+  .file-dl-btn:hover { background: var(--success-soft); border-color: var(--success); color: var(--success); }
 
   /* === Editor === */
   .editor { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -128,29 +129,33 @@
 
   .editor-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
 
-  .pdf-area {
-    flex: 1; overflow: auto; background: var(--bg-soft);
-    display: flex; align-items: flex-start; justify-content: center;
-    padding: 20px; position: relative; min-height: 0;
-    -webkit-overflow-scrolling: touch;
-  }
+  .pdf-area { flex: 1; overflow: auto; background: var(--bg-soft); display: flex; align-items: flex-start; justify-content: center; padding: 20px; position: relative; min-height: 0; -webkit-overflow-scrolling: touch; }
   .pdf-frame { background: white; box-shadow: var(--shadow-lg); border-radius: 4px; position: relative; }
   .pdf-frame canvas { display: block; border-radius: 4px; }
-  .pdf-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.85); border-radius: 4px; z-index: 10; }
+  .pdf-loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.85); border-radius: 4px; z-index: 20; }
 
-  /* Word layer — invisible divs over each word, clickable */
-  .word-layer { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; }
-  .word { position: absolute; cursor: pointer; pointer-events: auto; background: transparent; border-radius: 2px; transition: background 0.08s; }
-  .word:hover { background: rgba(37, 99, 235, 0.18); }
-  .word.selected { background: rgba(37, 99, 235, 0.28); outline: 1.5px solid var(--accent); }
+  /* Text layer — words overlaid exactly on canvas pixels for hover/click */
+  .text-layer { position: absolute; inset: 0; overflow: hidden; line-height: 1; user-select: none; }
+  .text-layer span {
+    position: absolute;
+    color: transparent;
+    white-space: pre;
+    cursor: pointer;
+    transform-origin: 0% 0%;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 0.08s;
+  }
+  .text-layer span:hover { background: rgba(37, 99, 235, 0.22); color: transparent; }
+  .text-layer span.selected { background: rgba(37, 99, 235, 0.32); color: transparent; box-shadow: 0 0 0 1px var(--accent); }
 
   .instruction-banner { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-size: 13px; font-weight: 500; box-shadow: var(--shadow-lg); z-index: 5; animation: slideDown 0.3s ease-out; pointer-events: none; }
   @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
   .overlay { position: absolute; pointer-events: none; border-radius: 3px; }
-  .overlay-tab { background: var(--accent); border: 2px solid white; box-shadow: 0 2px 8px rgba(37, 99, 235, 0.5); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 600; animation: placeDrop 0.25s ease-out; white-space: nowrap; overflow: hidden; }
-  .overlay-panel { background: rgba(37, 99, 235, 0.06); border: 1.5px dashed rgba(37, 99, 235, 0.45); animation: fadeIn 0.3s ease-out; }
-  .overlay-panel-label { position: absolute; top: 4px; left: 8px; font-size: 10px; font-weight: 600; color: var(--accent-dark); background: white; padding: 2px 6px; border-radius: 4px; }
+  .overlay-tab { background: var(--accent); border: 1.5px solid white; box-shadow: 0 2px 6px rgba(37, 99, 235, 0.5); display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: 600; animation: placeDrop 0.2s ease-out; white-space: nowrap; overflow: hidden; z-index: 10; }
+  .overlay-panel { background: rgba(37, 99, 235, 0.05); border: 1.5px dashed rgba(37, 99, 235, 0.4); animation: fadeIn 0.3s ease-out; z-index: 9; }
+  .overlay-panel-label { position: absolute; top: 3px; left: 6px; font-size: 9px; font-weight: 600; color: var(--accent-dark); background: white; padding: 1px 5px; border-radius: 3px; }
   @keyframes placeDrop { from { transform: scale(0.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
@@ -166,11 +171,15 @@
 
   .sidebar { width: 360px; background: var(--bg-card); border-left: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
   .sidebar-title { font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -0.01em; margin: 0 0 4px; }
-  .placed-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--success-soft); color: #15803d; border-radius: 999px; font-size: 12px; font-weight: 600; width: fit-content; }
+  .placed-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--success-soft); color: #15803d; border-radius: 999px; font-size: 12px; font-weight: 600; width: fit-content; max-width: 100%; }
   .placed-indicator.anchor { background: var(--accent-soft); color: var(--accent-dark); }
+  .placed-indicator span.word { display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; font-family: var(--serif); font-style: italic; }
   .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
   .secondary-actions { display: flex; gap: 8px; }
   .secondary-actions > * { flex: 1; }
+
+  .compat-notice { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.5; }
+  .compat-notice b { color: #422006; }
 
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 999px; font-size: 14px; font-weight: 500; box-shadow: var(--shadow-lg); z-index: 100; animation: toastIn 0.2s ease-out; }
   @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -190,7 +199,7 @@
     .page-nav { bottom: 10px; }
     .upload-title { font-size: 32px; }
     .list-title { font-size: 26px; }
-    .file-row { padding: 12px 14px; gap: 10px; }
+    .file-row { padding: 10px 12px; gap: 10px; }
     .file-meta { display: none; }
   }
   @media (max-width: 500px) {
@@ -211,9 +220,9 @@
 <script type="text/babel">
 const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
-// ================================================================
+// =========================================================================
 // API
-// ================================================================
+// =========================================================================
 const API = "";
 const api = {
   upload: async (files) => {
@@ -223,8 +232,8 @@ const api = {
     if (!r.ok) throw new Error("Upload failed");
     return r.json();
   },
-  list: async (params = {}) => {
-    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([_, v]) => v))).toString();
+  list: async (p = {}) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(p).filter(([, v]) => v))).toString();
     return (await fetch(`${API}/api/files${qs ? "?" + qs : ""}`)).json();
   },
   stats: async () => (await fetch(`${API}/api/files/stats`)).json(),
@@ -245,52 +254,51 @@ const api = {
   downloadAllUrl: () => `${API}/api/download-all`,
 };
 
-// ================================================================
-// Layout math (MUST mirror backend) — SMALLER TAB for word anchor feel
-// ================================================================
-const TAB_W = 140, TAB_H = 30;
-function computeLayout(clickX, clickY, pageW, pageH, panelHHint = 130) {
-  const tabW = Math.min(TAB_W, pageW - 40);
-  const tabH = TAB_H;
-  const panelW = Math.min(pageW - 40, 460);
+// =========================================================================
+// Layout math — MUST match backend processing.py exactly
+// =========================================================================
+function tabSize(label) {
+  const s = label || "Show details";
+  return { w: Math.max(60, Math.min(160, s.length * 7 + 20)), h: 26 };
+}
+
+function computeLayout(clickX, clickY, pageW, pageH, label, panelHHint = 130) {
+  const { w: tw, h: tabH } = tabSize(label);
+  const tabW = Math.min(tw, pageW - 40);
+  const panelW = Math.min(pageW - 40, 420);
   const panelH = Math.min(panelHHint, pageH - tabH - 60);
   let tabX = clickX - tabW / 2, tabY = clickY - tabH / 2;
   tabX = Math.max(20, Math.min(pageW - tabW - 20, tabX));
   tabY = Math.max(20, Math.min(pageH - tabH - 20, tabY));
   let panelX = tabX + tabW / 2 - panelW / 2;
   panelX = Math.max(20, Math.min(pageW - panelW - 20, panelX));
-  // Panel above tab (higher Y) by default; fall back to below if no room
   let panelY = tabY + tabH + 10;
   if (panelY + panelH > pageH - 20) panelY = Math.max(20, tabY - panelH - 10);
   return { tabX, tabY, tabW, tabH, panelX, panelY, panelW, panelH };
 }
 
-// ================================================================
+// =========================================================================
 // Toast
-// ================================================================
+// =========================================================================
 const ToastCtx = React.createContext(() => {});
 function ToastHost({ children }) {
   const [msg, setMsg] = useState(null);
   const show = useCallback(m => { setMsg(m); setTimeout(() => setMsg(null), 2000); }, []);
-  return (
-    <ToastCtx.Provider value={show}>
-      {children}
-      {msg && <div className="toast">{msg}</div>}
-    </ToastCtx.Provider>
-  );
+  return <ToastCtx.Provider value={show}>{children}{msg && <div className="toast">{msg}</div>}</ToastCtx.Provider>;
 }
 const useToast = () => React.useContext(ToastCtx);
 
-// ================================================================
-// PDF Preview with word-level click
-// ================================================================
-function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, onEmptyClick, tabClick, selectedWordKey, needsClick }) {
+// =========================================================================
+// PDF Preview with word-accurate click via pdf.js getTextContent
+// =========================================================================
+function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick, tabClick, tabLabel, selectedWordKey, needsClick }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
-  const wordLayerRef = useRef(null);
+  const textLayerRef = useRef(null);
   const [fitScale, setFitScale] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [dims, setDims] = useState({ w: 0, h: 0, pdfW: 612, pdfH: 792 });
+  const [numPages, setNumPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const renderTaskRef = useRef(null);
   const docRef = useRef(null);
@@ -302,10 +310,10 @@ function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, on
     docRef.current = null;
     (async () => {
       try {
-        const task = pdfjsLib.getDocument(api.previewUrl(fileId));
-        const pdf = await task.promise;
+        const pdf = await pdfjsLib.getDocument(api.previewUrl(fileId)).promise;
         if (cancelled) return;
         docRef.current = pdf;
+        setNumPages(pdf.numPages);
         onPageChange && onPageChange({ numPages: pdf.numPages });
         renderPage();
       } catch (e) { console.error(e); setLoading(false); }
@@ -319,17 +327,15 @@ function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, on
     try {
       const idx = Math.min(pageIndex, pdf.numPages - 1);
       const page = await pdf.getPage(idx + 1);
-      const baseViewport = page.getViewport({ scale: 1 });
+      const baseVp = page.getViewport({ scale: 1 });
 
       const area = wrapperRef.current.parentElement;
-      const availableW = area.clientWidth - 40;
-      const availableH = area.clientHeight - 40;
-      const fitW = availableW / baseViewport.width;
-      const fitH = availableH / baseViewport.height;
-      const fit = Math.min(fitW, fitH, 1.8);
+      const availW = area.clientWidth - 40;
+      const availH = area.clientHeight - 40;
+      const fit = Math.min(availW / baseVp.width, availH / baseVp.height, 1.8);
       const actualScale = fit * zoom;
-
       const viewport = page.getViewport({ scale: actualScale });
+
       const canvas = canvasRef.current;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = viewport.width * dpr;
@@ -344,79 +350,82 @@ function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, on
       renderTaskRef.current = rt;
       await rt.promise;
 
-      // Build word layer
-      const wl = wordLayerRef.current;
-      if (wl) {
-        wl.style.width = viewport.width + "px";
-        wl.style.height = viewport.height + "px";
-        wl.innerHTML = "";
+      // Build text layer using pdf.js-native per-item positioning.
+      // For word-level clicks we split each item's text on whitespace and size
+      // each word proportionally by character count (good enough for UI clicks).
+      const tl = textLayerRef.current;
+      if (tl) {
+        tl.innerHTML = "";
+        tl.style.width = viewport.width + "px";
+        tl.style.height = viewport.height + "px";
 
         try {
-          const textContent = await page.getTextContent();
-          textContent.items.forEach((item, itemIdx) => {
-            if (!item.str || !item.str.trim()) return;
+          const textContent = await page.getTextContent({ disableCombineTextItems: true });
 
-            // Split item string into words (keep per-word spans)
+          for (let itemIdx = 0; itemIdx < textContent.items.length; itemIdx++) {
+            const item = textContent.items[itemIdx];
+            if (!item.str || !item.str.trim()) continue;
+
+            // Use pdf.js's own matrix math for accurate positioning.
+            // tx = viewport.transform × item.transform
+            const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+            // tx[4] = left on canvas, tx[5] = baseline on canvas
+            const fontHeight = Math.hypot(tx[2], tx[3]);
+            const screenLeft = tx[4];
+            const screenTop = tx[5] - fontHeight;
+            const screenWidth = item.width * actualScale;
+
+            // Split into per-word spans
             const parts = item.str.split(/(\s+)/);
-            let cursorOffset = 0;
-            // Estimate width per character
-            const perCharWidth = item.width / Math.max(1, item.str.length);
+            const totalChars = item.str.length;
+            let charsConsumed = 0;
 
-            parts.forEach((part, partIdx) => {
-              if (!part.trim()) {
-                cursorOffset += part.length;
-                return;
-              }
-              // PDF coords for this word chunk
-              const pdfStartX = item.transform[4] + cursorOffset * perCharWidth;
-              const pdfWidth = part.length * perCharWidth;
-              const pdfBaseY = item.transform[5];
-              const pdfHeight = Math.hypot(item.transform[2], item.transform[3]);
+            for (let partIdx = 0; partIdx < parts.length; partIdx++) {
+              const part = parts[partIdx];
+              const partChars = part.length;
+              const partFraction = partChars / totalChars;
+              const partScreenWidth = screenWidth * partFraction;
+              const partScreenLeft = screenLeft + (charsConsumed / totalChars) * screenWidth;
+              charsConsumed += partChars;
 
-              // Screen coords
-              const screenX = pdfStartX * actualScale;
-              const screenBaseY = viewport.height - (pdfBaseY * actualScale);
-              const screenW = pdfWidth * actualScale;
-              const screenH = pdfHeight * actualScale;
+              if (!part.trim()) continue; // whitespace: skip span but advance cursor
 
-              const el = document.createElement("div");
-              el.className = "word";
-              el.style.left = screenX + "px";
-              el.style.top = (screenBaseY - screenH) + "px";
-              el.style.width = screenW + "px";
-              el.style.height = screenH + "px";
-              el.title = part;
+              const span = document.createElement("span");
+              span.textContent = part;
+              span.style.left = partScreenLeft + "px";
+              span.style.top = screenTop + "px";
+              span.style.fontSize = fontHeight + "px";
+              span.style.width = partScreenWidth + "px";
+              span.style.height = fontHeight + "px";
 
               const wordKey = `${itemIdx}:${partIdx}`;
-              el.dataset.wordKey = wordKey;
-              if (selectedWordKey === wordKey) el.classList.add("selected");
+              span.dataset.wordKey = wordKey;
+              if (wordKey === selectedWordKey) span.classList.add("selected");
 
-              el.onclick = (e) => {
+              // PDF coords for this word
+              const pdfLeftX = item.transform[4] + (charsConsumed - partChars) / totalChars * item.width;
+              const pdfRightX = pdfLeftX + item.width * partFraction;
+              const pdfBaseY = item.transform[5];
+              const pdfH = Math.hypot(item.transform[2], item.transform[3]);
+              const pdfCenterY = pdfBaseY + pdfH / 2;
+
+              span.onclick = (e) => {
                 e.stopPropagation();
-                // Tab anchors BELOW the word (lower Y in PDF coords)
-                const wordCenterX = pdfStartX + pdfWidth / 2;
-                const wordBottomY = pdfBaseY; // baseline approx
-                // Place tab center just below word
-                const tabCenterY = wordBottomY - (TAB_H / 2 + 8);
                 onWordClick && onWordClick({
-                  x: wordCenterX,
-                  y: tabCenterY,
-                  wordKey,
-                  word: part,
+                  wordRightX: pdfRightX,
+                  wordCenterY: pdfCenterY,
+                  wordKey, word: part.trim(),
                 });
               };
 
-              wl.appendChild(el);
-              cursorOffset += part.length;
-            });
-          });
-        } catch (e) {
-          console.warn("Text layer failed, fallback to raw click", e);
-        }
+              tl.appendChild(span);
+            }
+          }
+        } catch (e) { console.warn("text layer error", e); }
       }
 
       setFitScale(fit);
-      setDims({ w: viewport.width, h: viewport.height, pdfW: baseViewport.width, pdfH: baseViewport.height });
+      setDims({ w: viewport.width, h: viewport.height, pdfW: baseVp.width, pdfH: baseVp.height });
       setLoading(false);
     } catch (e) {
       if (e.name !== "RenderingCancelledException") { console.error(e); setLoading(false); }
@@ -425,13 +434,11 @@ function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, on
 
   useEffect(() => { renderPage(); }, [pageIndex, zoom, renderPage]);
 
-  // Update "selected" class without re-rendering entire layer
   useEffect(() => {
-    const wl = wordLayerRef.current;
-    if (!wl) return;
-    wl.querySelectorAll(".word").forEach(el => {
-      if (el.dataset.wordKey === selectedWordKey) el.classList.add("selected");
-      else el.classList.remove("selected");
+    const tl = textLayerRef.current;
+    if (!tl) return;
+    tl.querySelectorAll("span").forEach(el => {
+      el.classList.toggle("selected", el.dataset.wordKey === selectedWordKey);
     });
   }, [selectedWordKey]);
 
@@ -441,40 +448,35 @@ function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, on
     return () => window.removeEventListener("resize", onResize);
   }, [renderPage]);
 
-  // Click on empty area of page (between words) → place tab at click point
-  const handleFrameClick = (e) => {
+  const handleCanvasClick = (e) => {
     if (!canvasRef.current || !dims.w) return;
-    // Only fire if click actually hit canvas (not a word)
     if (e.target !== canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
-    const cx = e.clientX - rect.left;
-    const cy = e.clientY - rect.top;
-    const actualScale = fitScale * zoom;
-    const pdfX = cx / actualScale;
-    const pdfY = (dims.h - cy) / actualScale;
-    onEmptyClick && onEmptyClick({ x: pdfX, y: pdfY });
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const s = fitScale * zoom;
+    onEmptyClick && onEmptyClick({ x: cx / s, y: (dims.h - cy) / s });
   };
 
-  // Build overlay
+  // Overlay render (tab preview + panel preview)
   let overlay = null;
   if (tabClick && dims.pdfW) {
-    const actualScale = fitScale * zoom;
-    const layout = computeLayout(tabClick.x, tabClick.y, dims.pdfW, dims.pdfH);
-    const toCss = (r) => ({
+    const s = fitScale * zoom;
+    const layout = computeLayout(tabClick.x, tabClick.y, dims.pdfW, dims.pdfH, tabLabel);
+    const css = (r) => ({
       position: "absolute",
-      left: r.x * actualScale,
-      top: (dims.pdfH - (r.y + r.h)) * actualScale,
-      width: r.w * actualScale,
-      height: r.h * actualScale,
+      left: r.x * s,
+      top: (dims.pdfH - (r.y + r.h)) * s,
+      width: r.w * s,
+      height: r.h * s,
     });
-    const tabCss = toCss({ x: layout.tabX, y: layout.tabY, w: layout.tabW, h: layout.tabH });
-    const panelCss = toCss({ x: layout.panelX, y: layout.panelY, w: layout.panelW, h: layout.panelH });
     overlay = (
       <>
-        <div className="overlay overlay-panel" style={panelCss}>
-          <div className="overlay-panel-label">Hidden text area</div>
+        <div className="overlay overlay-panel" style={css({ x: layout.panelX, y: layout.panelY, w: layout.panelW, h: layout.panelH })}>
+          <div className="overlay-panel-label">Hidden text</div>
         </div>
-        <div className="overlay overlay-tab" style={tabCss}>Tab</div>
+        <div className="overlay overlay-tab" style={css({ x: layout.tabX, y: layout.tabY, w: layout.tabW, h: layout.tabH })}>
+          {tabLabel || "Show details"}
+        </div>
       </>
     );
   }
@@ -489,12 +491,12 @@ function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, on
       </div>
 
       {needsClick && !loading && (
-        <div className="instruction-banner">👇 Tap any word to attach your tab to it</div>
+        <div className="instruction-banner">👇 Tap any word to pin the tab next to it</div>
       )}
 
       <div ref={wrapperRef} className="pdf-frame" style={{ opacity: loading ? 0.4 : 1 }}>
-        <canvas ref={canvasRef} onClick={handleFrameClick} />
-        <div ref={wordLayerRef} className="word-layer" />
+        <canvas ref={canvasRef} onClick={handleCanvasClick} />
+        <div ref={textLayerRef} className="text-layer" />
         {overlay}
         {loading && <div className="pdf-loading"><div className="spinner" /></div>}
       </div>
@@ -510,13 +512,13 @@ function PdfPreview({ fileId, pageIndex, numPages, onPageChange, onWordClick, on
   );
 }
 
-// ================================================================
-// Upload screen
-// ================================================================
+// =========================================================================
+// Upload
+// =========================================================================
 function UploadScreen({ onDone, initialFiles }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [prog, setProg] = useState({ done: 0, total: 0 });
   const inputRef = useRef(null);
   const toast = useToast();
 
@@ -524,11 +526,10 @@ function UploadScreen({ onDone, initialFiles }) {
     const files = Array.from(fileList).filter(f => /\.(pdf|docx)$/i.test(f.name));
     if (!files.length) { toast("No PDF or Word files found"); return; }
     setUploading(true);
-    setProgress({ done: 0, total: files.length });
-    const BATCH = 10;
-    for (let i = 0; i < files.length; i += BATCH) {
-      try { await api.upload(files.slice(i, i + BATCH)); } catch (e) { console.error(e); }
-      setProgress({ done: Math.min(i + BATCH, files.length), total: files.length });
+    setProg({ done: 0, total: files.length });
+    for (let i = 0; i < files.length; i += 10) {
+      try { await api.upload(files.slice(i, i + 10)); } catch (e) { console.error(e); }
+      setProg({ done: Math.min(i + 10, files.length), total: files.length });
     }
     setUploading(false);
     toast(`Added ${files.length} file${files.length === 1 ? "" : "s"}`);
@@ -539,7 +540,7 @@ function UploadScreen({ onDone, initialFiles }) {
     <div className="upload-page">
       <div className="upload-hero">
         <h1 className="upload-title">Add a <em>hidden tab</em><br/>to your documents</h1>
-        <p className="upload-sub">Upload your files, click on a word, type what should appear.<br/>Done.</p>
+        <p className="upload-sub">Upload your files, click on a word, type what should appear. Done.</p>
       </div>
       <div
         className={"drop-zone" + (dragging ? " dragging" : "")}
@@ -551,7 +552,7 @@ function UploadScreen({ onDone, initialFiles }) {
         {uploading ? (
           <>
             <div className="drop-icon"><div className="spinner" style={{ width: 32, height: 32 }} /></div>
-            <div className="drop-heading">Uploading {progress.done} of {progress.total}...</div>
+            <div className="drop-heading">Uploading {prog.done} of {prog.total}...</div>
             <div className="drop-sub">Word docs take a few seconds each to convert</div>
           </>
         ) : (
@@ -564,7 +565,7 @@ function UploadScreen({ onDone, initialFiles }) {
         <input ref={inputRef} type="file" multiple accept=".pdf,.docx" style={{ display: "none" }} onChange={(e) => doUpload(e.target.files)} />
       </div>
       <div className="help-note">
-        <b>How it works.</b> Upload documents, open each one, and click on the word you want the tab to attach to. Type the hidden message, save, and move to the next. Download everything as one zip when you're done.
+        <b>Important:</b> the finished PDFs need to be opened in <b>Adobe Acrobat Reader</b> (free) for the click-to-toggle to work. Mac Preview, iPhone Files, and web browser PDF viewers don't run PDF JavaScript — the hidden text stays hidden, but clicking the tab won't reveal it.
       </div>
       {initialFiles > 0 && (
         <div style={{ marginTop: 16, textAlign: "center" }}>
@@ -575,9 +576,9 @@ function UploadScreen({ onDone, initialFiles }) {
   );
 }
 
-// ================================================================
-// File list
-// ================================================================
+// =========================================================================
+// List
+// =========================================================================
 function FileListScreen({ files, stats, onEdit, onUpload, onRefresh, onReset }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(new Set());
@@ -590,16 +591,20 @@ function FileListScreen({ files, stats, onEdit, onUpload, onRefresh, onReset }) 
   const firstPending = files.findIndex(f => f.status === "pending" || f.status === "configured");
   const by = stats?.by_status || {};
   const done = by.processed || 0, inProgress = by.configured || 0, pending = by.pending || 0;
+  const doneFiles = files.filter(f => f.status === "processed");
 
   const toggleSel = (id) => setSelected(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const bulkDel = async () => {
-    if (!selected.size) return;
-    if (!confirm(`Remove ${selected.size} files?`)) return;
+    if (!selected.size || !confirm(`Remove ${selected.size} files?`)) return;
     await api.bulkDelete(Array.from(selected));
     setSelected(new Set());
     await onRefresh();
     toast("Removed");
   };
+
+  // Smart download: 1 file → PDF, 2+ → zip
+  const downloadHref = done === 1 && doneFiles[0] ? api.downloadUrl(doneFiles[0].id) : api.downloadAllUrl();
+  const downloadLabel = done === 1 ? "↓ Download PDF" : `↓ Download ${done} as zip`;
 
   const statusText = (s) => ({ pending: "Not started", configured: "Processing…", processed: "Done", error: "Error", skipped: "Skipped" }[s] || s);
 
@@ -612,7 +617,7 @@ function FileListScreen({ files, stats, onEdit, onUpload, onRefresh, onReset }) 
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn-secondary" onClick={onUpload}>＋ Add more</button>
-          {done > 0 && <a className="btn-accent" href={api.downloadAllUrl()} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>↓ Download {done} done</a>}
+          {done > 0 && <a className="btn-accent" href={downloadHref} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>{downloadLabel}</a>}
           {firstPending >= 0 && <button className="btn-primary" onClick={() => onEdit(files[firstPending].id)}>{done > 0 ? "Continue →" : "Start →"}</button>}
         </div>
       </div>
@@ -648,6 +653,9 @@ function FileListScreen({ files, stats, onEdit, onUpload, onRefresh, onReset }) 
                 <div className="file-meta">{f.page_count} page{f.page_count === 1 ? "" : "s"}</div>
               </div>
               <span className={"file-status status-" + f.status}>{statusText(f.status)}</span>
+              {f.has_processed && (
+                <a className="file-dl-btn" href={api.downloadUrl(f.id)} onClick={e => e.stopPropagation()} title="Download this PDF">↓</a>
+              )}
             </div>
           ))}
         </div>
@@ -661,15 +669,15 @@ function FileListScreen({ files, stats, onEdit, onUpload, onRefresh, onReset }) 
   );
 }
 
-// ================================================================
-// Editor screen
-// ================================================================
+// =========================================================================
+// Editor
+// =========================================================================
 function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
   const toast = useToast();
   const [file, setFile] = useState(null);
   const [cfg, setCfg] = useState(null);
-  const [numPages, setNumPages] = useState(1);
   const [saving, setSaving] = useState(false);
+  const anchorTimerRef = useRef(null);
 
   const currentIdx = files.findIndex(f => f.id === currentId);
   const total = files.length;
@@ -684,19 +692,31 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
         page_index: 0, click_x: null, click_y: null,
         tab_label: "Show details", hidden_text: "",
         anchor_word: null, anchor_word_key: null,
+        anchor_right_x: null, anchor_center_y: null,
       });
     });
     return () => { cancelled = true; };
   }, [currentId]);
 
-  // Default tab placement to bottom-center the first time
+  // Default placement at bottom-center on first open
   useEffect(() => {
     if (!file || !cfg) return;
     if (cfg.click_x == null && file.page_sizes?.length) {
-      const [w, h] = file.page_sizes[cfg.page_index || 0] || [612, 792];
+      const [w] = file.page_sizes[cfg.page_index || 0] || [612];
       setCfg(c => ({ ...c, click_x: w / 2, click_y: 60 }));
     }
   }, [file, cfg?.page_index]);
+
+  // When label changes AND tab is anchored to a word, re-compute tab center X
+  // so the tab stays pinned to the right of the word.
+  useEffect(() => {
+    if (!cfg || cfg.anchor_right_x == null) return;
+    const { w: tabW } = tabSize(cfg.tab_label);
+    const newX = cfg.anchor_right_x + 6 + tabW / 2;
+    if (Math.abs((cfg.click_x || 0) - newX) > 0.5) {
+      setCfg(c => ({ ...c, click_x: newX }));
+    }
+  }, [cfg?.tab_label, cfg?.anchor_right_x]);
 
   const updateCfg = (patch) => setCfg(prev => ({ ...prev, ...patch }));
 
@@ -705,11 +725,11 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
 
   const saveAndNext = async () => {
     if (!cfg) return;
-    const finalCfg = { ...cfg };
-    if (finalCfg.click_x == null) { finalCfg.click_x = pageW / 2; finalCfg.click_y = 60; }
+    const final = { ...cfg };
+    if (final.click_x == null) { final.click_x = pageW / 2; final.click_y = 60; }
     setSaving(true);
     try {
-      await api.updateConfig(currentId, finalCfg);
+      await api.updateConfig(currentId, final);
       onRefresh();
       toast("Saved ✓");
       const next = files[currentIdx + 1];
@@ -728,8 +748,8 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
   const copyFromPrev = () => {
     const prev = files[currentIdx - 1];
     if (prev?.config) {
-      const { page_index, anchor_word_key, ...rest } = prev.config;
-      updateCfg({ ...rest, anchor_word_key: null });
+      const { page_index, ...rest } = prev.config;
+      updateCfg({ ...rest, anchor_word: null, anchor_word_key: null, anchor_right_x: null, anchor_center_y: null });
       toast("Copied from previous");
     }
   };
@@ -754,6 +774,26 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
   const hasPlacement = cfg.click_x != null;
   const isAnchored = !!cfg.anchor_word;
 
+  const handleWordClick = ({ wordRightX, wordCenterY, word, wordKey }) => {
+    const { w: tabW } = tabSize(cfg.tab_label);
+    updateCfg({
+      click_x: wordRightX + 6 + tabW / 2,
+      click_y: wordCenterY,
+      anchor_word: word,
+      anchor_word_key: wordKey,
+      anchor_right_x: wordRightX,
+      anchor_center_y: wordCenterY,
+    });
+  };
+
+  const handleEmptyClick = ({ x, y }) => {
+    updateCfg({
+      click_x: x, click_y: y,
+      anchor_word: null, anchor_word_key: null,
+      anchor_right_x: null, anchor_center_y: null,
+    });
+  };
+
   return (
     <div className="editor">
       <div className="editor-top">
@@ -772,11 +812,11 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
           <PdfPreview
             fileId={file.id}
             pageIndex={cfg.page_index || 0}
-            numPages={numPages}
-            onPageChange={(x) => { if (x.numPages) setNumPages(x.numPages); if (x.pageIndex != null) updateCfg({ page_index: x.pageIndex, anchor_word: null, anchor_word_key: null }); }}
-            onWordClick={({ x, y, word, wordKey }) => updateCfg({ click_x: x, click_y: y, anchor_word: word, anchor_word_key: wordKey })}
-            onEmptyClick={({ x, y }) => updateCfg({ click_x: x, click_y: y, anchor_word: null, anchor_word_key: null })}
+            onPageChange={(x) => { if (x.pageIndex != null) updateCfg({ page_index: x.pageIndex, anchor_word: null, anchor_word_key: null, anchor_right_x: null, anchor_center_y: null }); }}
+            onWordClick={handleWordClick}
+            onEmptyClick={handleEmptyClick}
             tabClick={hasPlacement ? { x: cfg.click_x, y: cfg.click_y } : null}
+            tabLabel={cfg.tab_label}
             selectedWordKey={cfg.anchor_word_key}
             needsClick={!hasPlacement}
           />
@@ -786,27 +826,36 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
           <div>
             <h2 className="sidebar-title">Tab details</h2>
             {isAnchored ? (
-              <div className="placed-indicator anchor">📌 Attached to "{cfg.anchor_word}"</div>
+              <div className="placed-indicator anchor">📌 Pinned to <span className="word">"{cfg.anchor_word}"</span></div>
             ) : hasPlacement ? (
-              <div className="placed-indicator">✓ Tab placed · tap a word to attach it</div>
+              <div className="placed-indicator">✓ Tab placed · click a word to pin it</div>
             ) : null}
           </div>
+
           <div>
-            <label className="label">What the button says</label>
+            <label className="label">Button text</label>
             <input className="input" value={cfg.tab_label} onChange={e => updateCfg({ tab_label: e.target.value })} placeholder="Show details" />
           </div>
+
           <div>
-            <label className="label">What appears when clicked</label>
-            <textarea className="textarea" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type the hidden message here..." />
+            <label className="label">Hidden message (shown when tab is clicked)</label>
+            <textarea className="textarea" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type what should appear..." />
           </div>
+
           {currentIdx > 0 && (
             <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0 }}>↺ Copy from previous file</button>
           )}
+
+          <div className="compat-notice">
+            <b>Note:</b> the interactive tab works in <b>Adobe Acrobat Reader</b> (free). In Mac Preview or browsers the hidden text stays hidden, but the click-to-toggle won't work.
+          </div>
+
           {file.error_msg && (
             <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: 12, fontSize: 13, color: "#991b1b" }}>
               <b>Problem:</b> {file.error_msg}
             </div>
           )}
+
           <div className="sidebar-footer">
             <button className="btn-primary" onClick={saveAndNext} disabled={saving} style={{ width: "100%" }}>
               {saving ? "Saving..." : (currentIdx < total - 1 ? "Save and continue →" : "Save and finish")}
@@ -822,9 +871,9 @@ function EditorScreen({ files, currentId, onNavigate, onBack, onRefresh }) {
   );
 }
 
-// ================================================================
+// =========================================================================
 // App
-// ================================================================
+// =========================================================================
 function App() {
   const [phase, setPhase] = useState("loading");
   const [files, setFiles] = useState([]);
