@@ -775,7 +775,7 @@ function UploadScreen({ hasFiles, onUploaded }) {
       <div className="upload-note">
         <div className="icon">✨</div>
         <div>
-          <b style={{ color: "#14532d" }}>Works everywhere.</b> The note is stored as a native PDF annotation. Click it in Chrome, Safari, Preview, Adobe Reader, or mobile — the message appears. No downloads needed for your readers.
+          <b style={{ color: "#14532d" }}>Works everywhere.</b> Click the tab icon in any PDF viewer — Chrome, Safari, Preview, Adobe Reader, or mobile — and the reader jumps to a full-page view with your hidden message. Unlimited length, natural scrolling, no popups to fight with.
         </div>
       </div>
       {hasFiles && (
@@ -1135,18 +1135,12 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
               )}
             </div>
             <div>
-              <label className="label">Popup title</label>
-              <input className="input" value={cfg.tab_label || ""} onChange={e => updateCfg({ tab_label: e.target.value })} placeholder="Show details" />
+              <label className="label">Page title (optional)</label>
+              <input className="input" value={cfg.tab_label || ""} onChange={e => updateCfg({ tab_label: e.target.value })} placeholder="e.g. Details, Bonus, Instructions" />
             </div>
             <div>
               <label className="label">Hidden message</label>
-              <textarea ref={textareaRef} className="textarea textarea-bounded" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type what should appear..." />
-              <div className={"char-counter" + ((cfg.hidden_text?.length || 0) > 250 ? " warn" : "")}>
-                <span>{(cfg.hidden_text || "").length} characters</span>
-                {(cfg.hidden_text?.length || 0) > 250 && (
-                  <span>⚠️ Chrome may cut this off — stays fine in Preview &amp; Adobe</span>
-                )}
-              </div>
+              <textarea ref={textareaRef} className="textarea textarea-bounded" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type as much as you want — unlimited length, readers scroll through it naturally..." />
             </div>
             {prevId && (
               <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0, fontSize: 13 }}>↺ Copy from previous file</button>
@@ -1159,7 +1153,7 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
             )}
             <div className="compat-notice">
               <div style={{ fontWeight: 700, marginBottom: 2 }}>✨ Works in every PDF viewer</div>
-              <div>Chrome, Safari, Preview, iPhone, Adobe Reader — your note shows up in all of them.</div>
+              <div>Clicking the <b>v</b> icon jumps to a full-page view with your message. A "← Back to document" link returns to the original. Same behavior in Chrome, Safari, Preview, Adobe, mobile.</div>
             </div>
             {file.error_msg && (
               <div style={{ background: "var(--danger-soft)", border: "1px solid #fecaca", borderRadius: "var(--r-sm)", padding: 12, fontSize: 13, color: "#991b1b" }}>
