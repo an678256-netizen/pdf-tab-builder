@@ -711,7 +711,7 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
 // =========================================================================
 // Upload screen
 // =========================================================================
-function UploadScreen({ hasFiles }) {
+function UploadScreen({ hasFiles, onUploaded }) {
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [prog, setProg] = useState({ done: 0, total: 0 });
@@ -732,6 +732,9 @@ function UploadScreen({ hasFiles }) {
     setUploading(false);
     if (failed) toast({ msg: `${files.length - failed} uploaded, ${failed} failed`, kind: "error" });
     else toast({ msg: `Added ${files.length} file${files.length === 1 ? "" : "s"}` });
+    // Refresh the file list BEFORE navigating, otherwise App's "empty -> /upload"
+    // redirect effect sees a stale empty list and bounces us back here.
+    await onUploaded();
     navigate("/files");
   };
 
@@ -1234,7 +1237,7 @@ function App() {
         </div>
       </div>
 
-      {route.name === "upload" && <UploadScreen hasFiles={files.length > 0} />}
+      {route.name === "upload" && <UploadScreen hasFiles={files.length > 0} onUploaded={refresh} />}
       {route.name === "list" && <FileListScreen files={files} stats={stats} loading={loading} onRefresh={refresh} onOpenShortcuts={() => setShortcutsOpen(true)} />}
       {route.name === "editor" && (
         files.find(f => f.id === route.fileId)
