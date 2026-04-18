@@ -1161,31 +1161,21 @@ function EditorScreen({ fileId, files, onRefresh }) {
 
   // Click on a word → create new tab or move selected tab
   const handleWordClick = ({ wordLeftX, wordCenterY, word, wordKey }) => {
-    const shouldCreate = isPlacing || tabs.length === 0;
-    if (shouldCreate) {
-      const newTab = {
-        id: Math.random().toString(36).slice(2),
-        page_index: currentPage,
-        click_x: Math.max(8, wordLeftX - 10),
-        click_y: wordCenterY,
-        tab_label: "",
-        hidden_text: "",
-        anchor_word: word,
-        anchor_word_key: wordKey,
-      };
-      const newTabs = [...tabs, newTab];
-      setTabs(newTabs);
-      setSelectedIdx(newTabs.length - 1);
-      setIsPlacing(false);
-    } else if (selectedIdx >= 0) {
-      updateTab(selectedIdx, {
-        page_index: currentPage,
-        click_x: Math.max(8, wordLeftX - 10),
-        click_y: wordCenterY,
-        anchor_word: word,
-        anchor_word_key: wordKey,
-      });
-    }
+    // Always create a new tab on word click
+    const newTab = {
+      id: Math.random().toString(36).slice(2),
+      page_index: currentPage,
+      click_x: Math.max(8, wordLeftX - 10),
+      click_y: wordCenterY,
+      tab_label: "",
+      hidden_text: "",
+      anchor_word: word,
+      anchor_word_key: wordKey,
+    };
+    const newTabs = [...tabs, newTab];
+    setTabs(newTabs);
+    setSelectedIdx(newTabs.length - 1);
+    setIsPlacing(false);
   };
 
   const handleEmptyClick = ({ y }) => {
@@ -1304,17 +1294,16 @@ function EditorScreen({ fileId, files, onRefresh }) {
         <div className="sidebar">
           <div className="sidebar-scroll">
             <div>
-              <h2 className="sidebar-title">Hidden messages</h2>
-              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{tabs.length} tab{tabs.length !== 1 ? "s" : ""} · {numPages} page{numPages !== 1 ? "s" : ""}</div>
+              <h2 className="sidebar-title">Hidden message{tabs.length > 1 ? "s" : ""}</h2>
             </div>
 
-            {tabs.length === 0 && !isPlacing && (
+            {tabs.length === 0 && (
               <div className="placing-banner">
-                <span>👆 Click any word on the document to add a hidden message</span>
+                <span>👆 Click any word to place a hidden message</span>
               </div>
             )}
 
-            {tabs.length > 0 && (
+            {tabs.length > 1 && (
               <div className="tab-list">
                 {tabs.map((tab, i) => (
                   <div key={tab.id} className={"tab-item" + (i === selectedIdx ? " active" : "")} onClick={() => selectTab(i)}>
@@ -1322,36 +1311,26 @@ function EditorScreen({ fileId, files, onRefresh }) {
                       <span className="tab-item-page">Page {(tab.page_index || 0) + 1}</span>
                       {tab.anchor_word && <span className="tab-item-word">· {tab.anchor_word}</span>}
                     </div>
-                    <div className="tab-item-preview">{(tab.hidden_text || "").slice(0, 50) || "No message yet"}{(tab.hidden_text || "").length > 50 ? "…" : ""}</div>
+                    <div className="tab-item-preview">{(tab.hidden_text || "").slice(0, 50) || "Empty"}{(tab.hidden_text || "").length > 50 ? "…" : ""}</div>
                     <button className="tab-item-delete" onClick={(e) => { e.stopPropagation(); deleteTab(i); }} title="Remove">✕</button>
                   </div>
                 ))}
               </div>
             )}
 
-            {isPlacing ? (
-              <div className="placing-banner">
-                <span>👆 Click a word on any page to place the new tab</span>
-                <button className="btn-ghost btn-sm" onClick={() => setIsPlacing(false)}>Cancel</button>
-              </div>
-            ) : (
-              <button className="btn-secondary" onClick={() => setIsPlacing(true)} style={{ width: "100%" }}>＋ Add a tab</button>
-            )}
-
             {selectedTab && (
-              <div className="tab-detail">
-                <div>
-                  <label className="label">Popup title</label>
-                  <input className="input" value={selectedTab.tab_label || ""} onChange={e => updateTab(selectedIdx, { tab_label: e.target.value })} placeholder="e.g. Old Code, Details" />
-                </div>
-                <div>
-                  <label className="label">Hidden message</label>
-                  <textarea ref={textareaRef} className="textarea" style={{ maxHeight: 180 }} value={selectedTab.hidden_text || ""} onChange={e => updateTab(selectedIdx, { hidden_text: e.target.value })} placeholder="What shows when this tab is clicked..." />
-                </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {tabs.length === 1 && selectedTab.anchor_word && (
+                  <div className="placed-indicator anchor">📌 {selectedTab.anchor_word} · page {(selectedTab.page_index || 0) + 1}</div>
+                )}
+                <textarea ref={textareaRef} className="textarea" style={{ minHeight: 160 }} value={selectedTab.hidden_text || ""} onChange={e => updateTab(selectedIdx, { hidden_text: e.target.value })} placeholder="Type what shows when this tab is clicked..." />
+                {tabs.length > 1 && (
+                  <div style={{ fontSize: 12, color: "var(--text-subtle)" }}>Click another word to add more tabs. Click a tab above to switch.</div>
+                )}
               </div>
             )}
 
-            {prevId && (
+            {prevId && tabs.length === 0 && (
               <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0, fontSize: 13 }}>↺ Copy tabs from previous file</button>
             )}
 
@@ -1367,7 +1346,7 @@ function EditorScreen({ fileId, files, onRefresh }) {
 
             <div className="compat-notice">
               <div style={{ fontWeight: 700, marginBottom: 2 }}>✨ Share via viewer link</div>
-              <div>After saving, share the <b>Viewer</b> link. Readers click any tab icon and the message pops up — any browser, any device.</div>
+              <div>After saving, share the <b>Viewer</b> link. Readers click the tab and the message appears.</div>
             </div>
           </div>
           <div className="sidebar-footer">
