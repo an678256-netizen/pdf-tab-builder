@@ -282,6 +282,33 @@
     .list-page, .upload-page { padding-left: 14px; padding-right: 14px; }
   }
 
+  /* =========== Viewer =========== */
+  .viewer { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--bg-soft); }
+  .viewer-bar { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .viewer-info { flex: 1; min-width: 0; }
+  .viewer-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+  .viewer-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .viewer-hint { text-align: center; padding: 10px 16px; font-size: 13px; color: var(--text-muted); background: var(--bg-card); border-bottom: 1px solid var(--border); animation: fadeIn 0.3s; }
+  .viewer-pdf { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 24px; position: relative; min-height: 0; }
+
+  /* Viewer popup */
+  .vp-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; animation: fadeIn 0.15s var(--ease); }
+  .vp-card { background: var(--bg-card); border-radius: var(--r-lg); box-shadow: var(--sh-xl); max-width: 540px; width: 92%; max-height: 78vh; display: flex; flex-direction: column; animation: modalIn 0.2s var(--ease); overflow: hidden; }
+  .vp-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .vp-title { font-family: var(--serif); font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; color: var(--text); }
+  .vp-close { width: 34px; height: 34px; background: var(--bg-soft); border: none; border-radius: var(--r-sm); font-size: 16px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+  .vp-close:hover { background: var(--border); color: var(--text); }
+  .vp-body { padding: 22px 24px; overflow-y: auto; flex: 1; min-height: 0; font-size: 15px; line-height: 1.7; color: var(--text); font-family: var(--sans); }
+  .vp-body p { margin: 0 0 12px; }
+  .vp-body p:last-child { margin-bottom: 0; }
+
+  @media (max-width: 600px) {
+    .vp-card { max-width: 100%; width: 100%; max-height: 85vh; border-radius: var(--r-lg) var(--r-lg) 0 0; position: fixed; bottom: 0; left: 0; right: 0; animation: slideUp 0.25s var(--ease); }
+    .viewer-bar { padding: 10px 14px; }
+    .viewer-pdf { padding: 12px; }
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; border: 2px solid var(--bg); }
@@ -349,6 +376,7 @@ function parseHash(hash) {
   if (parts[0] === "upload") return { name: "upload" };
   if (parts[0] === "files") return { name: "list" };
   if (parts[0] === "edit" && parts[1]) return { name: "editor", fileId: parts[1] };
+  if (parts[0] === "view" && parts[1]) return { name: "viewer", fileId: parts[1] };
   return { name: "list" };
 }
 function useRoute() {
@@ -370,6 +398,7 @@ function routeTitle(route, files = []) {
     const f = files.find(x => x.id === route.fileId);
     return (f ? `Editing ${f.original_name}` : "Editing") + " — Tab Builder";
   }
+  if (route.name === "viewer") return "View — Tab Builder";
   return "Tab Builder";
 }
 
@@ -523,7 +552,7 @@ function ShortcutsModal({ open, onClose, inEditor }) {
 // =========================================================================
 // PDF preview component
 // =========================================================================
-function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick, tabClick, selectedWordKey, pdfAreaRef }) {
+function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick, tabClick, selectedWordKey, pdfAreaRef, onTabClick }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const textLayerRef = useRef(null);
@@ -685,7 +714,8 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
       height: layout.tabH * s,
     };
     const tabFontSize = Math.max(8, layout.tabW * s * 0.55);
-    overlay = <div className="overlay overlay-tab" style={{ ...tabCss, fontSize: tabFontSize, lineHeight: 1 }}>v</div>;
+    const clickable = !!onTabClick;
+    overlay = <div className="overlay overlay-tab" style={{ ...tabCss, fontSize: tabFontSize, lineHeight: 1, pointerEvents: clickable ? 'auto' : 'none', cursor: clickable ? 'pointer' : 'default' }} onClick={onTabClick}>v</div>;
   }
 
   return (
@@ -1024,7 +1054,7 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
       await api.updateConfig(fileId, final);
       setInitialCfg(JSON.parse(JSON.stringify(final)));
       onRefresh();
-      toast({ msg: "Saved ✓", action: { label: "View PDF ↗", href: api.downloadUrl(fileId) } });
+      toast({ msg: "Saved ✓", action: { label: "Open viewer ↗", href: "#/view/" + fileId } });
       if (advance) {
         if (nextId) navigate(`/edit/${nextId}`);
         else { toast({ msg: "All done!" }); navigate("/files"); }
@@ -1147,8 +1177,11 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
             )}
             {file.has_processed && (
               <div className="preview-card">
-                <span>This file's saved output</span>
-                <a href={api.downloadUrl(file.id)} target="_blank" rel="noopener">Preview ↗</a>
+                <span>Saved</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <a href={api.downloadUrl(file.id)} target="_blank" rel="noopener">PDF ↗</a>
+                  <a href={"#/view/" + file.id} target="_blank" rel="noopener">Viewer ↗</a>
+                </div>
               </div>
             )}
             <div className="compat-notice">
@@ -1172,6 +1205,119 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// Viewer popup — the styled HTML popup that replaces PDF viewer popups
+// =========================================================================
+function ViewerPopup({ title, content, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const paragraphs = (content || "").split("\n");
+
+  return (
+    <div className="vp-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="vp-card">
+        <div className="vp-header">
+          <h3 className="vp-title">{title || "Details"}</h3>
+          <button className="vp-close" onClick={onClose} title="Close (Esc)">✕</button>
+        </div>
+        <div className="vp-body">
+          {paragraphs.map((line, i) => (
+            <p key={i}>{line || "\u00A0"}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// Viewer screen — public-facing page for readers (no editing UI)
+// =========================================================================
+function ViewerScreen({ fileId }) {
+  const [file, setFile] = useState(null);
+  const [error, setError] = useState(null);
+  const [popupOpen, setPopupOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const pdfAreaRef = useRef(null);
+
+  useEffect(() => {
+    api.get(fileId).then(setFile).catch(e => setError(e.message));
+  }, [fileId]);
+
+  useEffect(() => {
+    if (file) document.title = `${file.original_name} — Tab Builder`;
+  }, [file]);
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  if (error) return (
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="empty-state">
+        <div className="empty-icon">😕</div>
+        <h2 className="empty-title">Can't load this document</h2>
+        <p className="empty-sub">{error}</p>
+      </div>
+    </div>
+  );
+
+  if (!file) return (
+    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div className="spinner" />
+    </div>
+  );
+
+  const cfg = file.config || {};
+  const hasTab = cfg.click_x != null && cfg.hidden_text;
+
+  return (
+    <div className="viewer">
+      <div className="viewer-bar">
+        <div className="viewer-info">
+          <span className="viewer-name">{file.original_name}</span>
+        </div>
+        <div className="viewer-actions">
+          <button className="btn-secondary btn-sm" onClick={copyLink}>
+            {copied ? "✓ Copied" : "📋 Copy link"}
+          </button>
+          {file.has_processed && (
+            <a className="btn-primary btn-sm" href={api.downloadUrl(file.id)} style={{ textDecoration: "none" }}>↓ Download PDF</a>
+          )}
+        </div>
+      </div>
+      {hasTab && !popupOpen && (
+        <div className="viewer-hint">Click the <b>v</b> icon on the document to reveal the hidden message</div>
+      )}
+      <div className="viewer-pdf" ref={pdfAreaRef}>
+        <PdfPreview
+          fileId={file.id}
+          pageIndex={cfg.page_index || 0}
+          onPageChange={() => {}}
+          tabClick={hasTab ? { x: cfg.click_x, y: cfg.click_y } : null}
+          selectedWordKey={null}
+          pdfAreaRef={pdfAreaRef}
+          onTabClick={hasTab ? () => setPopupOpen(true) : undefined}
+        />
+      </div>
+      {popupOpen && (
+        <ViewerPopup
+          title={cfg.tab_label}
+          content={cfg.hidden_text}
+          onClose={() => setPopupOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -1231,20 +1377,23 @@ function App() {
 
   return (
     <>
-      <div className="topbar">
-        <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
-          <div className="brand-mark">T</div>
-          <div className="brand-name">Tab <em>Builder</em></div>
-        </a>
-        <div className="top-nav">
-          {route.name !== "upload" && <button className="btn-ghost" onClick={() => navigate("/upload")}>＋ Upload</button>}
-          {route.name !== "list" && files.length > 0 && <button className="btn-ghost" onClick={() => navigate("/files")}>Files</button>}
-          <button className="btn-ghost" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)" style={{ padding: "7px 9px", fontSize: 13 }}>?</button>
+      {route.name !== "viewer" && (
+        <div className="topbar">
+          <a className="brand" href="#/" onClick={(e) => { e.preventDefault(); navigate("/"); }}>
+            <div className="brand-mark">T</div>
+            <div className="brand-name">Tab <em>Builder</em></div>
+          </a>
+          <div className="top-nav">
+            {route.name !== "upload" && <button className="btn-ghost" onClick={() => navigate("/upload")}>＋ Upload</button>}
+            {route.name !== "list" && files.length > 0 && <button className="btn-ghost" onClick={() => navigate("/files")}>Files</button>}
+            <button className="btn-ghost" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)" style={{ padding: "7px 9px", fontSize: 13 }}>?</button>
+          </div>
         </div>
-      </div>
+      )}
 
       {route.name === "upload" && <UploadScreen hasFiles={files.length > 0} onUploaded={refresh} />}
       {route.name === "list" && <FileListScreen files={files} stats={stats} loading={loading} onRefresh={refresh} onOpenShortcuts={() => setShortcutsOpen(true)} />}
+      {route.name === "viewer" && <ViewerScreen fileId={route.fileId} />}
       {route.name === "editor" && (
         files.find(f => f.id === route.fileId)
           ? <EditorScreen fileId={route.fileId} files={files} onRefresh={refresh} onOpenShortcuts={() => setShortcutsOpen(true)} />
