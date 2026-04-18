@@ -69,14 +69,12 @@ def _compute_layout(click_x, click_y, page_w, page_h):
     tab_x = max(2, min(page_w - tab_w - 2, click_x - tab_w / 2))
     tab_y = max(2, min(page_h - tab_h - 2, click_y - tab_h / 2))
 
-    popup_w = min(420, page_w * 0.62)
-    popup_h = min(360, page_h * 0.48)
-    popup_x = tab_x + tab_w + 12
-    popup_y = tab_y + tab_h / 2 - popup_h / 2
-    if popup_x + popup_w > page_w - 10:
-        popup_x = tab_x - popup_w - 12
-    popup_x = max(10, min(page_w - popup_w - 10, popup_x))
-    popup_y = max(10, min(page_h - popup_h - 10, popup_y))
+    # Popup: placed on the RIGHT side of the page to avoid covering the icon
+    popup_w = min(380, page_w * 0.55)
+    popup_h = min(340, page_h * 0.45)
+    popup_x = page_w - popup_w - 20          # flush right with margin
+    popup_y = max(20, tab_y - popup_h / 2)   # vertically centered on icon
+    popup_y = min(page_h - popup_h - 20, popup_y)
 
     return {
         "tab_x": tab_x, "tab_y": tab_y, "tab_w": tab_w, "tab_h": tab_h,
