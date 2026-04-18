@@ -1205,7 +1205,18 @@ function EditorScreen({ fileId, files, onRefresh }) {
   const saveAndNext = async (advance = true) => {
     setSaving(true);
     try {
-      await api.updateConfig(fileId, { tabs });
+      // Include first tab's fields at top level for backward compatibility —
+      // the backend checks for click_x to know if processing is needed.
+      // processing.py reads from the tabs array instead.
+      const saveConfig = { tabs };
+      if (tabs.length > 0) {
+        saveConfig.click_x = tabs[0].click_x;
+        saveConfig.click_y = tabs[0].click_y;
+        saveConfig.page_index = tabs[0].page_index || 0;
+        saveConfig.hidden_text = tabs[0].hidden_text || "";
+        saveConfig.tab_label = tabs[0].tab_label || "Note";
+      }
+      await api.updateConfig(fileId, saveConfig);
       setInitialTabs(JSON.stringify(tabs));
       onRefresh();
       toast({ msg: `Saved ${tabs.length} tab${tabs.length !== 1 ? "s" : ""} ✓`, action: { label: "Open viewer ↗", href: "#/view/" + fileId } });
