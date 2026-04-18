@@ -1,14 +1,17 @@
 """
 PDF processing: add a click-to-reveal sticky-note popup to PDFs.
 
-Uses native PDF text annotations (/Subtype /Text). Click the tab icon in any
-PDF viewer and the popup opens. Click outside to close.
+Uses native PDF text annotations (/Subtype /Text) with an explicit /Popup
+companion annotation that controls the popup's size and position. This gives
+a large, readable popup that doesn't cover the tab icon.
 
 Viewer behavior:
-- Chrome: yellow popup rendered as part of the page. Long text extends below
-  viewport; scroll the PDF page to see more.
-- Preview, Firefox, Adobe Reader, mobile: popup opens as a floating window
-  with its own scroll area. Click-to-open, click-to-close.
+- Preview (Mac): popup opens as a floating window with scrollbar. Respects
+  the /Popup rect for size and position. Click icon to open/close.
+- Adobe Reader: same — floating, scrollable, respects size/position.
+- Chrome: renders as a yellow box. Size/position partially respected.
+  Long text: scroll the PDF page to see more.
+- Firefox, mobile: popup behavior varies but content always accessible.
 
 Also handles DOCX → PDF conversion via LibreOffice headless.
 """
@@ -66,11 +69,33 @@ TAB_H = 18.0
 
 
 def _compute_layout(click_x, click_y, page_w, page_h):
-    """Return tab rectangle clamped to page bounds. Click point = tab center."""
+    """Return tab rect + popup rect. Popup is large and positioned to the
+    right of the icon (or left if no space), never overlapping the icon."""
     tab_w, tab_h = TAB_W, TAB_H
     tab_x = max(2, min(page_w - tab_w - 2, click_x - tab_w / 2))
     tab_y = max(2, min(page_h - tab_h - 2, click_y - tab_h / 2))
-    return {"tab_x": tab_x, "tab_y": tab_y, "tab_w": tab_w, "tab_h": tab_h}
+
+    # Popup: ~60% page width, ~45% page height — large enough for real reading
+    popup_w = min(420, page_w * 0.62)
+    popup_h = min(360, page_h * 0.48)
+
+    # Try placing popup to the RIGHT of the icon with a 12pt gap
+    popup_x = tab_x + tab_w + 12
+    # Vertically center on the icon
+    popup_y = tab_y + tab_h / 2 - popup_h / 2
+
+    # If popup goes off the right edge, place it to the LEFT of the icon
+    if popup_x + popup_w > page_w - 10:
+        popup_x = tab_x - popup_w - 12
+
+    # Clamp to page bounds
+    popup_x = max(10, min(page_w - popup_w - 10, popup_x))
+    popup_y = max(10, min(page_h - popup_h - 10, popup_y))
+
+    return {
+        "tab_x": tab_x, "tab_y": tab_y, "tab_w": tab_w, "tab_h": tab_h,
+        "popup_x": popup_x, "popup_y": popup_y, "popup_w": popup_w, "popup_h": popup_h,
+    }
 
 
 def _build_icon_appearance_stream(writer):
@@ -116,10 +141,10 @@ def _build_icon_appearance_stream(writer):
 
 def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     """
-    Add a click-to-reveal sticky-note popup annotation to the PDF.
+    Add a click-to-reveal sticky-note popup to the PDF with a properly sized
+    and positioned popup window.
 
-    Idempotent: strips any existing text annotations on the target page first,
-    so re-processing a file produces exactly one tab, not a stack.
+    Idempotent: strips existing text/popup annotations on the target page first.
     """
     page_index = int(config.get("page_index", 0))
     click_x = float(config["click_x"])
@@ -137,7 +162,7 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     page_w = float(box.width)
     page_h = float(box.height)
 
-    # Strip any existing /Text annotations on the target page
+    # Strip existing /Text and /Popup annotations (idempotent re-processing)
     annots_key = NameObject("/Annots")
     if annots_key in page:
         existing = page[annots_key]
@@ -145,7 +170,7 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
         for a in existing:
             try:
                 ao = a.get_object()
-                if ao.get("/Subtype") == "/Text":
+                if ao.get("/Subtype") in ("/Text", "/Popup"):
                     continue
             except Exception:
                 pass
@@ -155,6 +180,7 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     layout = _compute_layout(click_x, click_y, page_w, page_h)
     ap_ref = _build_icon_appearance_stream(writer)
 
+    # --- Build the text annotation (the icon + content) ---
     text_annot = DictionaryObject({
         NameObject("/Type"): NameObject("/Annot"),
         NameObject("/Subtype"): NameObject("/Text"),
@@ -175,14 +201,37 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
         NameObject("/AP"): DictionaryObject({
             NameObject("/N"): ap_ref,
         }),
+        # Default appearance: larger font for the popup content text
+        NameObject("/DA"): create_string_object("/Helv 13 Tf 0.10 0.10 0.10 rg"),
         NameObject("/P"): page.indirect_reference,
     })
-    annot_ref = writer._add_object(text_annot)
+    text_annot_ref = writer._add_object(text_annot)
 
+    # --- Build the popup annotation (controls popup window size + position) ---
+    popup_annot = DictionaryObject({
+        NameObject("/Type"): NameObject("/Annot"),
+        NameObject("/Subtype"): NameObject("/Popup"),
+        NameObject("/Rect"): ArrayObject([
+            FloatObject(layout["popup_x"]),
+            FloatObject(layout["popup_y"]),
+            FloatObject(layout["popup_x"] + layout["popup_w"]),
+            FloatObject(layout["popup_y"] + layout["popup_h"]),
+        ]),
+        NameObject("/Parent"): text_annot_ref,
+        NameObject("/Open"): NumberObject(0),
+        NameObject("/F"): NumberObject(0),   # don't print the popup window
+    })
+    popup_ref = writer._add_object(popup_annot)
+
+    # Link the text annotation to its popup
+    text_annot[NameObject("/Popup")] = popup_ref
+
+    # Add both annotations to the page
     if annots_key in page:
-        page[annots_key].append(annot_ref)
+        page[annots_key].append(text_annot_ref)
+        page[annots_key].append(popup_ref)
     else:
-        page[annots_key] = ArrayObject([annot_ref])
+        page[annots_key] = ArrayObject([text_annot_ref, popup_ref])
 
     with open(output_pdf_path, "wb") as f:
         writer.write(f)
