@@ -239,7 +239,24 @@
 
   .overlay { position: absolute; pointer-events: none; }
   .overlay-tab { background: white; border-radius: 3px; border: 1px solid rgba(55, 65, 81, 0.55); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); display: flex; align-items: center; justify-content: center; color: #374151; font-weight: 700; animation: placeDrop 0.22s var(--ease); z-index: 10; }
+  .overlay-tab-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 2px 6px rgba(37, 99, 235, 0.3); z-index: 11; }
   @keyframes placeDrop { from { transform: scale(0.65); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* Tab list in editor sidebar */
+  .tab-list { display: flex; flex-direction: column; gap: 6px; }
+  .tab-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-sm); cursor: pointer; transition: all 0.12s; position: relative; background: var(--bg-card); }
+  .tab-item:hover { border-color: var(--border-strong); background: var(--bg-soft); }
+  .tab-item.active { border-color: var(--accent); background: var(--accent-soft); }
+  .tab-item-header { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 3px; }
+  .tab-item-page { color: var(--text); }
+  .tab-item-word { font-family: var(--serif); font-style: italic; color: var(--accent-dark); max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tab-item-preview { font-size: 12px; color: var(--text-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-style: italic; }
+  .tab-item-delete { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border: none; background: transparent; color: var(--text-subtle); font-size: 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s; }
+  .tab-item:hover .tab-item-delete { opacity: 1; }
+  .tab-item-delete:hover { background: var(--danger-soft); color: var(--danger); }
+  .placing-banner { background: var(--accent-soft); border: 1.5px dashed var(--accent); border-radius: var(--r-sm); padding: 12px 14px; text-align: center; font-size: 13px; color: var(--accent-dark); display: flex; flex-direction: column; gap: 8px; align-items: center; animation: fadeIn 0.2s; }
+  .tab-detail { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; border-top: 1px solid var(--border); }
+  .tab-empty { text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: 14px; }
 
   .pdf-controls { position: absolute; top: 14px; right: 14px; display: flex; gap: 4px; background: var(--bg-card); padding: 4px; border-radius: var(--r-sm); box-shadow: var(--sh); z-index: 4; }
   .pdf-controls button { width: 32px; height: 32px; background: transparent; border: none; color: var(--text); display: inline-flex; align-items: center; justify-content: center; font-size: 15px; border-radius: 5px; }
@@ -610,7 +627,7 @@ function ShortcutsModal({ open, onClose, inEditor }) {
 // =========================================================================
 // PDF preview component
 // =========================================================================
-function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick, tabClick, selectedWordKey, pdfAreaRef, onTabClick }) {
+function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick, tabs: tabOverlays, selectedTabId, selectedWordKey, pdfAreaRef, onTabClick }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const textLayerRef = useRef(null);
@@ -761,19 +778,29 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
   };
 
   let overlay = null;
-  if (tabClick && dims.pdfW) {
+  if (tabOverlays && tabOverlays.length > 0 && dims.pdfW) {
     const s = fitScale * zoom;
-    const layout = computeLayout(tabClick.x, tabClick.y, dims.pdfW, dims.pdfH);
-    const tabCss = {
-      position: "absolute",
-      left: layout.tabX * s,
-      top: (dims.pdfH - (layout.tabY + layout.tabH)) * s,
-      width: layout.tabW * s,
-      height: layout.tabH * s,
-    };
-    const tabFontSize = Math.max(8, layout.tabW * s * 0.55);
-    const clickable = !!onTabClick;
-    overlay = <div className="overlay overlay-tab" style={{ ...tabCss, fontSize: tabFontSize, lineHeight: 1, pointerEvents: clickable ? 'auto' : 'none', cursor: clickable ? 'pointer' : 'default' }} onClick={onTabClick}>v</div>;
+    overlay = tabOverlays.map(tab => {
+      const layout = computeLayout(tab.x, tab.y, dims.pdfW, dims.pdfH);
+      const tabCss = {
+        position: "absolute",
+        left: layout.tabX * s,
+        top: (dims.pdfH - (layout.tabY + layout.tabH)) * s,
+        width: layout.tabW * s,
+        height: layout.tabH * s,
+      };
+      const tabFontSize = Math.max(8, layout.tabW * s * 0.55);
+      const clickable = !!onTabClick;
+      const isSelected = tab.id === selectedTabId;
+      return (
+        <div key={tab.id} className={"overlay overlay-tab" + (isSelected ? " overlay-tab-selected" : "")}
+          style={{ ...tabCss, fontSize: tabFontSize, lineHeight: 1,
+            pointerEvents: clickable ? "auto" : "none",
+            cursor: clickable ? "pointer" : "default",
+          }}
+          onClick={() => onTabClick && onTabClick(tab.id)}>v</div>
+      );
+    });
   }
 
   return (
@@ -1012,7 +1039,8 @@ function FileListScreen({ files, stats, loading, onRefresh, onOpenShortcuts }) {
       ) : (
         <div className="file-grid">
           {filtered.map(f => {
-            const preview = f.config?.hidden_text?.trim().slice(0, 60) || "";
+            const tabCount = f.config?.tabs?.length || (f.config?.hidden_text ? 1 : 0);
+            const preview = tabCount > 1 ? `${tabCount} tabs` : (f.config?.tabs?.[0]?.hidden_text || f.config?.hidden_text || "").trim().slice(0, 50);
             return (
               <div key={f.id} className={"file-row" + (f.status === "processed" ? " done" : "")} onClick={() => navigate(`/edit/${f.id}`)}>
                 <div className={"file-check" + (selected.has(f.id) ? " checked" : "")} onClick={(e) => { e.stopPropagation(); toggleSel(f.id); }}>
@@ -1023,7 +1051,8 @@ function FileListScreen({ files, stats, loading, onRefresh, onOpenShortcuts }) {
                   <div className="file-name" title={f.original_name}>{f.original_name}</div>
                   <div className="file-meta">
                     <span>{f.page_count} page{f.page_count === 1 ? "" : "s"}</span>
-                    {preview && <span className="file-preview-text">{preview}{f.config?.hidden_text?.length > 60 ? "…" : ""}</span>}
+                    {preview && tabCount <= 1 && <span className="file-preview-text">{preview}{(f.config?.hidden_text || "").length > 50 ? "…" : ""}</span>}
+                    {tabCount > 1 && <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{preview}</span>}
                   </div>
                 </div>
                 <span className={"file-status status-" + f.status}>{statusText(f.status)}</span>
@@ -1049,12 +1078,15 @@ function FileListScreen({ files, stats, loading, onRefresh, onOpenShortcuts }) {
 // =========================================================================
 // Editor
 // =========================================================================
-function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
+function EditorScreen({ fileId, files, onRefresh }) {
   const toast = useToast();
   const confirm = useConfirm();
   const [file, setFile] = useState(null);
-  const [cfg, setCfg] = useState(null);
-  const [initialCfg, setInitialCfg] = useState(null);
+  const [tabs, setTabs] = useState([]);
+  const [initialTabs, setInitialTabs] = useState("[]");
+  const [selectedIdx, setSelectedIdx] = useState(-1);
+  const [isPlacing, setIsPlacing] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef(null);
   const pdfAreaRef = useRef(null);
@@ -1064,57 +1096,124 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
   const prevId = currentIdx > 0 ? files[currentIdx - 1]?.id : null;
   const nextId = currentIdx >= 0 && currentIdx < total - 1 ? files[currentIdx + 1]?.id : null;
 
+  // Load file + parse tabs (supports both old single-tab and new multi-tab formats)
   useEffect(() => {
     if (!fileId) return;
     let cancelled = false;
-    setFile(null); setCfg(null);
+    setFile(null); setTabs([]); setSelectedIdx(-1); setIsPlacing(false);
     api.get(fileId).then(f => {
       if (cancelled) return;
       setFile(f);
-      const c = f.config || {
-        page_index: 0, click_x: null, click_y: null,
-        tab_label: "Show details", hidden_text: "",
-        anchor_word: null, anchor_word_key: null,
-      };
-      setCfg(c);
-      setInitialCfg(JSON.parse(JSON.stringify(c)));
+      const cfg = f.config || {};
+      let parsed = [];
+      if (cfg.tabs) {
+        parsed = cfg.tabs;
+      } else if (cfg.click_x != null) {
+        parsed = [{ id: Math.random().toString(36).slice(2), ...cfg }];
+      }
+      setTabs(parsed);
+      setInitialTabs(JSON.stringify(parsed));
+      if (parsed.length > 0) { setSelectedIdx(0); setCurrentPage(parsed[0].page_index || 0); }
     }).catch(e => toast({ msg: "Couldn't load file: " + e.message, kind: "error" }));
     return () => { cancelled = true; };
   }, [fileId]);
 
+  // Auto-focus textarea when a tab is selected
   useEffect(() => {
-    if (!file || !cfg) return;
-    if (cfg.click_x == null && file.page_sizes?.length) {
-      const [, h] = file.page_sizes[cfg.page_index || 0] || [612, 792];
-      setCfg(c => ({ ...c, click_x: MARGIN_X, click_y: h - 80 }));
-    }
-  }, [file, cfg?.page_index]);
-
-  useEffect(() => {
-    if (file && cfg && textareaRef.current) {
-      const t = setTimeout(() => textareaRef.current?.focus(), 200);
+    if (selectedIdx >= 0 && textareaRef.current) {
+      const t = setTimeout(() => textareaRef.current?.focus(), 150);
       return () => clearTimeout(t);
     }
-  }, [file?.id]);
+  }, [selectedIdx, fileId]);
 
-  const updateCfg = (patch) => setCfg(prev => ({ ...prev, ...patch }));
-  const isDirty = cfg && initialCfg && JSON.stringify(cfg) !== JSON.stringify(initialCfg);
+  const isDirty = JSON.stringify(tabs) !== initialTabs;
+  const selectedTab = selectedIdx >= 0 ? tabs[selectedIdx] : null;
+  const pageW = file?.page_sizes?.[currentPage]?.[0] || 612;
+  const pageH = file?.page_sizes?.[currentPage]?.[1] || 792;
+  const numPages = file?.page_count || 1;
 
-  const pageW = file?.page_sizes?.[cfg?.page_index || 0]?.[0] || 612;
-  const pageH = file?.page_sizes?.[cfg?.page_index || 0]?.[1] || 792;
+  // Tabs on the currently visible page (for overlays)
+  const pageTabs = useMemo(() =>
+    tabs.filter(t => (t.page_index || 0) === currentPage).map(t => ({ id: t.id, x: t.click_x, y: t.click_y })),
+  [tabs, currentPage]);
+
+  const updateTab = (idx, patch) => {
+    setTabs(ts => ts.map((t, i) => i === idx ? { ...t, ...patch } : t));
+  };
+
+  const deleteTab = async (idx) => {
+    const ok = await confirm({
+      title: "Remove this tab?",
+      desc: `Tab on page ${(tabs[idx]?.page_index || 0) + 1}${tabs[idx]?.anchor_word ? ' near "' + tabs[idx].anchor_word + '"' : ''} will be removed.`,
+      confirmLabel: "Remove", confirmKind: "danger",
+    });
+    if (!ok) return;
+    setTabs(ts => ts.filter((_, i) => i !== idx));
+    setSelectedIdx(si => si >= idx ? Math.max(0, si - 1) : si);
+  };
+
+  // Click on a word → create new tab or move selected tab
+  const handleWordClick = ({ wordLeftX, wordCenterY, word, wordKey }) => {
+    if (isPlacing) {
+      // Creating a new tab
+      const newTab = {
+        id: Math.random().toString(36).slice(2),
+        page_index: currentPage,
+        click_x: Math.max(8, wordLeftX - 10),
+        click_y: wordCenterY,
+        tab_label: "",
+        hidden_text: "",
+        anchor_word: word,
+        anchor_word_key: wordKey,
+      };
+      setTabs(ts => [...ts, newTab]);
+      setSelectedIdx(tabs.length);
+      setIsPlacing(false);
+    } else if (selectedIdx >= 0) {
+      // Move selected tab to this position
+      updateTab(selectedIdx, {
+        page_index: currentPage,
+        click_x: Math.max(8, wordLeftX - 10),
+        click_y: wordCenterY,
+        anchor_word: word,
+        anchor_word_key: wordKey,
+      });
+    }
+  };
+
+  const handleEmptyClick = ({ y }) => {
+    if (isPlacing) {
+      const newTab = {
+        id: Math.random().toString(36).slice(2),
+        page_index: currentPage,
+        click_x: MARGIN_X,
+        click_y: y,
+        tab_label: "",
+        hidden_text: "",
+        anchor_word: null,
+        anchor_word_key: null,
+      };
+      setTabs(ts => [...ts, newTab]);
+      setSelectedIdx(tabs.length);
+      setIsPlacing(false);
+    }
+  };
+
+  const selectTab = (idx) => {
+    setSelectedIdx(idx);
+    const tab = tabs[idx];
+    if (tab) setCurrentPage(tab.page_index || 0);
+  };
 
   const saveAndNext = async (advance = true) => {
-    if (!cfg) return;
-    const final = { ...cfg };
-    if (final.click_x == null) { final.click_x = MARGIN_X; final.click_y = pageH - 80; }
     setSaving(true);
     try {
-      await api.updateConfig(fileId, final);
-      setInitialCfg(JSON.parse(JSON.stringify(final)));
+      await api.updateConfig(fileId, { tabs });
+      setInitialTabs(JSON.stringify(tabs));
       onRefresh();
-      toast({ msg: "Saved ✓", action: { label: "Open viewer ↗", href: "#/view/" + fileId } });
+      toast({ msg: `Saved ${tabs.length} tab${tabs.length !== 1 ? "s" : ""} ✓`, action: { label: "Open viewer ↗", href: "#/view/" + fileId } });
       if (advance) {
-        if (nextId) navigate(`/edit/${nextId}`);
+        if (nextId) navigate("/edit/" + nextId);
         else { toast({ msg: "All done!" }); navigate("/files"); }
       }
     } catch (e) { toast({ msg: "Save failed: " + e.message, kind: "error" }); }
@@ -1123,11 +1222,7 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
 
   const goBack = async () => {
     if (isDirty) {
-      const ok = await confirm({
-        title: "Discard changes?",
-        desc: "You have unsaved changes on this file.",
-        confirmLabel: "Discard", confirmKind: "danger",
-      });
+      const ok = await confirm({ title: "Discard changes?", desc: "You have unsaved changes.", confirmLabel: "Discard", confirmKind: "danger" });
       if (!ok) return;
     }
     navigate("/files");
@@ -1136,48 +1231,34 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
   const copyFromPrev = () => {
     if (!prevId) return;
     const prev = files.find(f => f.id === prevId);
-    if (prev?.config) {
-      const { page_index, ...rest } = prev.config;
-      updateCfg({ ...rest, anchor_word: null, anchor_word_key: null });
-      toast({ msg: "Copied from previous" });
+    if (prev?.config?.tabs) {
+      const copied = prev.config.tabs.map(t => ({ ...t, id: Math.random().toString(36).slice(2) }));
+      setTabs(copied);
+      if (copied.length > 0) { setSelectedIdx(0); setCurrentPage(copied[0].page_index || 0); }
+      toast({ msg: `Copied ${copied.length} tabs from previous file` });
     }
   };
 
+  // Keyboard shortcuts
   useEffect(() => {
     const h = (e) => {
-      const t = document.activeElement?.tagName;
-      const inInput = t === "INPUT" || t === "TEXTAREA";
-      if (e.key === "Escape") { goBack(); return; }
+      const tag = document.activeElement?.tagName;
+      const inInput = tag === "INPUT" || tag === "TEXTAREA";
+      if (e.key === "Escape") { if (isPlacing) setIsPlacing(false); else goBack(); return; }
       if (inInput && (e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); saveAndNext(); return; }
       if (inInput) return;
       if (e.key === "Enter") { e.preventDefault(); saveAndNext(); }
-      else if (e.key === "ArrowRight" && nextId) navigate(`/edit/${nextId}`);
-      else if (e.key === "ArrowLeft" && prevId) navigate(`/edit/${prevId}`);
+      else if (e.key === "ArrowRight" && nextId) navigate("/edit/" + nextId);
+      else if (e.key === "ArrowLeft" && prevId) navigate("/edit/" + prevId);
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [fileId, cfg, saving, isDirty, nextId, prevId]);
+  }, [fileId, tabs, saving, isDirty, nextId, prevId, isPlacing]);
 
-  if (!file || !cfg) return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div className="spinner" />
-    </div>
-  );
+  if (!file) return <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}><div className="spinner" /></div>;
 
   const processedCount = files.filter(f => f.status === "processed").length;
   const progressPct = total > 0 ? (processedCount / total * 100) : 0;
-  const isAnchored = !!cfg.anchor_word;
-
-  const handleWordClick = ({ wordLeftX, wordCenterY, word, wordKey }) => {
-    updateCfg({
-      click_x: Math.max(8, wordLeftX - 10),
-      click_y: wordCenterY,
-      anchor_word: word, anchor_word_key: wordKey,
-    });
-  };
-  const handleEmptyClick = ({ y }) => {
-    updateCfg({ click_x: MARGIN_X, click_y: y, anchor_word: null, anchor_word_key: null });
-  };
 
   return (
     <div className="editor">
@@ -1190,49 +1271,83 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
             <span>·</span>
             <span>{processedCount} done</span>
             {isDirty && !saving && <span className="save-indicator dirty">Unsaved</span>}
-            {saving && <span className="save-indicator dirty"><span className="spinner" style={{ width: 10, height: 10, borderWidth: 2 }}/> Saving</span>}
+            {saving && <span className="save-indicator dirty">Saving…</span>}
             {!isDirty && !saving && file.has_processed && <span className="save-indicator saved">✓ Saved</span>}
           </div>
           <div className="progress-thin"><div style={{ width: progressPct + "%" }} /></div>
         </div>
-        <button className="btn-icon" onClick={() => prevId && navigate(`/edit/${prevId}`)} disabled={!prevId} title="Previous (←)">‹</button>
-        <button className="btn-icon" onClick={() => nextId && navigate(`/edit/${nextId}`)} disabled={!nextId} title="Next (→)">›</button>
+        <button className="btn-icon" onClick={() => prevId && navigate("/edit/" + prevId)} disabled={!prevId} title="Previous (←)">‹</button>
+        <button className="btn-icon" onClick={() => nextId && navigate("/edit/" + nextId)} disabled={!nextId} title="Next (→)">›</button>
       </div>
 
       <div className="editor-body">
         <div className="pdf-area" ref={pdfAreaRef}>
           <PdfPreview
             fileId={file.id}
-            pageIndex={cfg.page_index || 0}
-            onPageChange={(x) => { if (x.pageIndex != null) updateCfg({ page_index: x.pageIndex, anchor_word: null, anchor_word_key: null }); }}
+            pageIndex={currentPage}
+            onPageChange={(x) => { if (x.pageIndex != null) setCurrentPage(x.pageIndex); }}
             onWordClick={handleWordClick}
             onEmptyClick={handleEmptyClick}
-            tabClick={cfg.click_x != null ? { x: cfg.click_x, y: cfg.click_y } : null}
-            selectedWordKey={cfg.anchor_word_key}
+            tabs={pageTabs}
+            selectedTabId={selectedTab?.id}
+            selectedWordKey={selectedTab?.anchor_word_key}
             pdfAreaRef={pdfAreaRef}
           />
         </div>
         <div className="sidebar">
           <div className="sidebar-scroll">
             <div>
-              <h2 className="sidebar-title">Hidden message</h2>
-              {isAnchored ? (
-                <div className="placed-indicator anchor">📌 On the line with <span className="word">{cfg.anchor_word}</span></div>
-              ) : (
-                <div className="placed-indicator">✓ Click a word to pin the note</div>
-              )}
+              <h2 className="sidebar-title">Hidden messages</h2>
+              <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{tabs.length} tab{tabs.length !== 1 ? "s" : ""} · {numPages} page{numPages !== 1 ? "s" : ""}</div>
             </div>
-            <div>
-              <label className="label">Popup title</label>
-              <input className="input" value={cfg.tab_label || ""} onChange={e => updateCfg({ tab_label: e.target.value })} placeholder="e.g. Details, Bonus, Instructions" />
-            </div>
-            <div>
-              <label className="label">Hidden message</label>
-              <textarea ref={textareaRef} className="textarea textarea-bounded" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type what should appear when the tab is clicked..." />
-            </div>
-            {prevId && (
-              <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0, fontSize: 13 }}>↺ Copy from previous file</button>
+
+            {tabs.length === 0 && !isPlacing && (
+              <div className="tab-empty">
+                No tabs yet. Click a word on the document or press the button below to add one.
+              </div>
             )}
+
+            {tabs.length > 0 && (
+              <div className="tab-list">
+                {tabs.map((tab, i) => (
+                  <div key={tab.id} className={"tab-item" + (i === selectedIdx ? " active" : "")} onClick={() => selectTab(i)}>
+                    <div className="tab-item-header">
+                      <span className="tab-item-page">Page {(tab.page_index || 0) + 1}</span>
+                      {tab.anchor_word && <span className="tab-item-word">· {tab.anchor_word}</span>}
+                    </div>
+                    <div className="tab-item-preview">{(tab.hidden_text || "").slice(0, 50) || "No message yet"}{(tab.hidden_text || "").length > 50 ? "…" : ""}</div>
+                    <button className="tab-item-delete" onClick={(e) => { e.stopPropagation(); deleteTab(i); }} title="Remove">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {isPlacing ? (
+              <div className="placing-banner">
+                <span>👆 Click a word on any page to place the new tab</span>
+                <button className="btn-ghost btn-sm" onClick={() => setIsPlacing(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button className="btn-secondary" onClick={() => setIsPlacing(true)} style={{ width: "100%" }}>＋ Add a tab</button>
+            )}
+
+            {selectedTab && (
+              <div className="tab-detail">
+                <div>
+                  <label className="label">Popup title</label>
+                  <input className="input" value={selectedTab.tab_label || ""} onChange={e => updateTab(selectedIdx, { tab_label: e.target.value })} placeholder="e.g. Old Code, Details" />
+                </div>
+                <div>
+                  <label className="label">Hidden message</label>
+                  <textarea ref={textareaRef} className="textarea" style={{ maxHeight: 180 }} value={selectedTab.hidden_text || ""} onChange={e => updateTab(selectedIdx, { hidden_text: e.target.value })} placeholder="What shows when this tab is clicked..." />
+                </div>
+              </div>
+            )}
+
+            {prevId && (
+              <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0, fontSize: 13 }}>↺ Copy tabs from previous file</button>
+            )}
+
             {file.has_processed && (
               <div className="preview-card">
                 <span>Saved</span>
@@ -1242,22 +1357,18 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
                 </div>
               </div>
             )}
+
             <div className="compat-notice">
               <div style={{ fontWeight: 700, marginBottom: 2 }}>✨ Share via viewer link</div>
-              <div>After saving, share the <b>Viewer</b> link. Readers click the tab icon and your message pops up — any browser, any device.</div>
+              <div>After saving, share the <b>Viewer</b> link. Readers click any tab icon and the message pops up — any browser, any device.</div>
             </div>
-            {file.error_msg && (
-              <div style={{ background: "var(--danger-soft)", border: "1px solid #fecaca", borderRadius: "var(--r-sm)", padding: 12, fontSize: 13, color: "#991b1b" }}>
-                <b>Problem:</b> {file.error_msg}
-              </div>
-            )}
           </div>
           <div className="sidebar-footer">
-            <button className="btn-primary" onClick={() => saveAndNext(true)} disabled={saving} style={{ width: "100%" }}>
+            <button className="btn-primary" onClick={() => saveAndNext(true)} disabled={saving || tabs.length === 0} style={{ width: "100%" }}>
               {saving ? "Saving..." : (nextId ? "Save and continue →" : "Save and finish")}
             </button>
             <div className="secondary-actions">
-              <button className="btn-secondary" onClick={() => saveAndNext(false)} disabled={saving}>Save only</button>
+              <button className="btn-secondary" onClick={() => saveAndNext(false)} disabled={saving || tabs.length === 0}>Save only</button>
               <button className="btn-secondary" onClick={goBack}>Back to list</button>
             </div>
           </div>
@@ -1266,6 +1377,7 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
     </div>
   );
 }
+
 
 // =========================================================================
 // Viewer popup — the styled HTML popup that replaces PDF viewer popups
@@ -1339,13 +1451,31 @@ function ViewerScreen({ fileId }) {
   );
 
   const cfg = file.config || {};
-  const hasTab = cfg.click_x != null && cfg.hidden_text;
+  // Parse tabs (supports both old single-tab and new multi-tab formats)
+  const allTabs = useMemo(() => {
+    if (cfg.tabs) return cfg.tabs;
+    if (cfg.click_x != null && cfg.hidden_text) return [{ id: "legacy", ...cfg }];
+    return [];
+  }, [file]);
+  const [viewPage, setViewPage] = useState(allTabs.length > 0 ? (allTabs[0].page_index || 0) : 0);
+  const numPages = file.page_count || 1;
+
+  // Tabs visible on the current viewer page
+  const pageTabs = useMemo(() =>
+    allTabs.filter(t => (t.page_index || 0) === viewPage).map(t => ({ id: t.id, x: t.click_x, y: t.click_y })),
+  [allTabs, viewPage]);
+
+  const openTab = (tabId) => {
+    const tab = allTabs.find(t => t.id === tabId);
+    if (tab) setPopupOpen(tab);
+  };
 
   return (
     <div className="viewer">
       <div className="viewer-bar">
         <div className="viewer-info">
           <span className="viewer-name">{file.original_name}</span>
+          {allTabs.length > 1 && <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>{allTabs.length} hidden messages</span>}
         </div>
         <div className="viewer-actions">
           <button className="btn-ghost btn-sm" onClick={toggleDark} style={{ fontSize: 15 }}>{dark ? "☀️" : "🌙"}</button>
@@ -1357,24 +1487,24 @@ function ViewerScreen({ fileId }) {
           )}
         </div>
       </div>
-      {hasTab && !popupOpen && (
-        <div className="viewer-hint">Click the <b>v</b> icon on the document to reveal the hidden message</div>
+      {allTabs.length > 0 && !popupOpen && (
+        <div className="viewer-hint">Click any <b>v</b> icon to reveal a hidden message{allTabs.length > 1 ? ` (${allTabs.length} total)` : ""}</div>
       )}
       <div className="viewer-pdf" ref={pdfAreaRef}>
         <PdfPreview
           fileId={file.id}
-          pageIndex={cfg.page_index || 0}
-          onPageChange={() => {}}
-          tabClick={hasTab ? { x: cfg.click_x, y: cfg.click_y } : null}
+          pageIndex={viewPage}
+          onPageChange={(x) => { if (x.pageIndex != null) setViewPage(x.pageIndex); }}
+          tabs={pageTabs}
           selectedWordKey={null}
           pdfAreaRef={pdfAreaRef}
-          onTabClick={hasTab ? () => setPopupOpen(true) : undefined}
+          onTabClick={openTab}
         />
       </div>
       {popupOpen && (
         <ViewerPopup
-          title={cfg.tab_label}
-          content={cfg.hidden_text}
+          title={popupOpen.tab_label}
+          content={popupOpen.hidden_text}
           onClose={() => setPopupOpen(false)}
         />
       )}
