@@ -1064,7 +1064,7 @@ function FileListScreen({ files, stats, loading, onRefresh, onOpenShortcuts }) {
                 </div>
                 <span className={"file-status status-" + f.status}>{statusText(f.status)}</span>
                 {f.has_processed && (
-                  <a className="file-act-btn" href={api.downloadUrl(f.id)} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} title="Preview output">↗</a>
+                  <a className="btn-accent btn-sm" href={api.downloadUrl(f.id)} onClick={e => e.stopPropagation()} style={{ textDecoration: "none", fontSize: 12 }}>↓ Download</a>
                 )}
               </div>
             );
