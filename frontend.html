@@ -257,6 +257,7 @@
   .tab-item-delete { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border: none; background: transparent; color: var(--text-subtle); font-size: 12px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.15s; }
   .tab-item:hover .tab-item-delete { opacity: 1; }
   .tab-item-delete:hover { background: var(--danger-soft); color: var(--danger); }
+  @media (hover: none) { .tab-item-delete { opacity: 0.6; } }
   .placing-banner { background: var(--accent-soft); border: 1.5px dashed var(--accent); border-radius: var(--r-sm); padding: 12px 14px; text-align: center; font-size: 13px; color: var(--accent-dark); display: flex; flex-direction: column; gap: 8px; align-items: center; animation: fadeIn 0.2s; }
   .tab-detail { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; border-top: 1px solid var(--border); }
   .tab-empty { text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: 14px; }
@@ -1146,7 +1147,7 @@ function EditorScreen({ fileId, files, onRefresh }) {
   const prevId = currentIdx > 0 ? files[currentIdx - 1]?.id : null;
   const nextId = currentIdx >= 0 && currentIdx < total - 1 ? files[currentIdx + 1]?.id : null;
 
-  // Load file + parse tabs (supports both old single-tab and new multi-tab formats)
+  // Load file + parse tabs, check for unsaved draft
   useEffect(() => {
     if (!fileId) return;
     let cancelled = false;
@@ -1155,18 +1156,44 @@ function EditorScreen({ fileId, files, onRefresh }) {
       if (cancelled) return;
       setFile(f);
       const cfg = f.config || {};
-      let parsed = [];
+      let serverTabs = [];
       if (cfg.tabs) {
-        parsed = cfg.tabs;
+        serverTabs = cfg.tabs;
       } else if (cfg.click_x != null) {
-        parsed = [{ id: Math.random().toString(36).slice(2), ...cfg }];
+        serverTabs = [{ id: Math.random().toString(36).slice(2), ...cfg }];
       }
-      setTabs(parsed);
-      setInitialTabs(JSON.stringify(parsed));
-      if (parsed.length > 0) { setSelectedIdx(0); setCurrentPage(parsed[0].page_index || 0); }
+      // Check for unsaved draft from a previous session
+      let useTabs = serverTabs;
+      try {
+        const draft = localStorage.getItem("tb-draft-" + fileId);
+        if (draft) {
+          const draftTabs = JSON.parse(draft);
+          if (draftTabs.length > 0 && JSON.stringify(draftTabs) !== JSON.stringify(serverTabs)) {
+            useTabs = draftTabs;
+            setTimeout(() => toast({ msg: "Restored your unsaved draft" }), 300);
+          } else {
+            localStorage.removeItem("tb-draft-" + fileId);
+          }
+        }
+      } catch {}
+      setTabs(useTabs);
+      setInitialTabs(JSON.stringify(serverTabs));
+      if (useTabs.length > 0) { setSelectedIdx(0); setCurrentPage(useTabs[0].page_index || 0); }
     }).catch(e => toast({ msg: "Couldn't load file: " + e.message, kind: "error" }));
     return () => { cancelled = true; };
   }, [fileId]);
+
+  // Auto-save draft to localStorage whenever tabs change
+  useEffect(() => {
+    if (!fileId || !file) return;
+    try {
+      if (tabs.length > 0) {
+        localStorage.setItem("tb-draft-" + fileId, JSON.stringify(tabs));
+      } else {
+        localStorage.removeItem("tb-draft-" + fileId);
+      }
+    } catch {}
+  }, [tabs, fileId, file]);
 
   // Auto-focus textarea when a tab is selected
   useEffect(() => {
@@ -1261,6 +1288,7 @@ function EditorScreen({ fileId, files, onRefresh }) {
       }
       await api.updateConfig(fileId, saveConfig);
       setInitialTabs(JSON.stringify(tabs));
+      try { localStorage.removeItem("tb-draft-" + fileId); } catch {}
       onRefresh();
       toast({ msg: `Saved ${tabs.length} tab${tabs.length !== 1 ? "s" : ""} ✓`, action: { label: "Open viewer ↗", href: "#/view/" + fileId } });
       if (advance) {
@@ -1275,6 +1303,7 @@ function EditorScreen({ fileId, files, onRefresh }) {
     if (isDirty) {
       const ok = await confirm({ title: "Discard changes?", desc: "You have unsaved changes.", confirmLabel: "Discard", confirmKind: "danger" });
       if (!ok) return;
+      try { localStorage.removeItem("tb-draft-" + fileId); } catch {}
     }
     navigate("/files");
   };
