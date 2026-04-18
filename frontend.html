@@ -639,6 +639,11 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
   const [isFull, setIsFull] = useState(false);
   const renderTaskRef = useRef(null);
   const docRef = useRef(null);
+  // Refs for callbacks — prevents stale closures in text layer click handlers
+  const wordClickRef = useRef(onWordClick);
+  const emptyClickRef = useRef(onEmptyClick);
+  wordClickRef.current = onWordClick;
+  emptyClickRef.current = onEmptyClick;
 
   useEffect(() => {
     const onFs = () => setIsFull(!!document.fullscreenElement);
@@ -741,7 +746,8 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
               const pdfCenterY = pdfBaseY + pdfH / 2;
               span.onclick = (e) => {
                 e.stopPropagation();
-                onWordClick && onWordClick({ wordLeftX: pdfLeftX, wordCenterY: pdfCenterY, wordKey, word: part.trim() });
+                const fn = wordClickRef.current;
+                fn && fn({ wordLeftX: pdfLeftX, wordCenterY: pdfCenterY, wordKey, word: part.trim() });
               };
               tl.appendChild(span);
             }
@@ -774,7 +780,8 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
     const rect = canvasRef.current.getBoundingClientRect();
     const cy = e.clientY - rect.top;
     const s = fitScale * zoom;
-    onEmptyClick && onEmptyClick({ y: (dims.h - cy) / s });
+    const fn = emptyClickRef.current;
+    fn && fn({ y: (dims.h - cy) / s });
   };
 
   let overlay = null;
@@ -1154,8 +1161,8 @@ function EditorScreen({ fileId, files, onRefresh }) {
 
   // Click on a word → create new tab or move selected tab
   const handleWordClick = ({ wordLeftX, wordCenterY, word, wordKey }) => {
-    if (isPlacing) {
-      // Creating a new tab
+    const shouldCreate = isPlacing || tabs.length === 0;
+    if (shouldCreate) {
       const newTab = {
         id: Math.random().toString(36).slice(2),
         page_index: currentPage,
@@ -1166,11 +1173,11 @@ function EditorScreen({ fileId, files, onRefresh }) {
         anchor_word: word,
         anchor_word_key: wordKey,
       };
-      setTabs(ts => [...ts, newTab]);
-      setSelectedIdx(tabs.length);
+      const newTabs = [...tabs, newTab];
+      setTabs(newTabs);
+      setSelectedIdx(newTabs.length - 1);
       setIsPlacing(false);
     } else if (selectedIdx >= 0) {
-      // Move selected tab to this position
       updateTab(selectedIdx, {
         page_index: currentPage,
         click_x: Math.max(8, wordLeftX - 10),
@@ -1302,8 +1309,8 @@ function EditorScreen({ fileId, files, onRefresh }) {
             </div>
 
             {tabs.length === 0 && !isPlacing && (
-              <div className="tab-empty">
-                No tabs yet. Click a word on the document or press the button below to add one.
+              <div className="placing-banner">
+                <span>👆 Click any word on the document to add a hidden message</span>
               </div>
             )}
 
