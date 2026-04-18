@@ -134,6 +134,9 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
         "tab_label": "Note",              # popup title
         "hidden_text": "Revealed content",
     }
+
+    Strips any existing /Text annotations on the target page first, so each
+    PDF ends up with exactly one tab regardless of re-processing.
     """
     page_index = int(config.get("page_index", 0))
     click_x = float(config["click_x"])
@@ -150,6 +153,24 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     box = page.mediabox
     page_w = float(box.width)
     page_h = float(box.height)
+
+    # --- Strip any existing /Text annotations on this page -----------------
+    # This handles two cases:
+    #   1) Re-processing a file that we already processed (old tab would stay)
+    #   2) Uploading a PDF that already contains sticky-notes from elsewhere
+    annots_key = NameObject("/Annots")
+    if annots_key in page:
+        existing = page[annots_key]
+        kept = ArrayObject()
+        for a in existing:
+            try:
+                ao = a.get_object()
+                if ao.get("/Subtype") == "/Text":
+                    continue  # drop it
+            except Exception:
+                pass
+            kept.append(a)
+        page[annots_key] = kept
 
     layout = _compute_layout(click_x, click_y, page_w, page_h)
 
@@ -183,7 +204,7 @@ def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
 
     annot_ref = writer._add_object(text_annot)
 
-    annots_key = NameObject("/Annots")
+    # page[annots_key] was already normalized to an ArrayObject above
     if annots_key in page:
         page[annots_key].append(annot_ref)
     else:
