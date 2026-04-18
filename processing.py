@@ -1,18 +1,17 @@
 """
-PDF processing: add a click-to-reveal sticky-note popup to PDFs.
+PDF processing: add multiple click-to-reveal sticky-note popups to PDFs.
 
-Uses native PDF text annotations (/Subtype /Text) with an explicit /Popup
-companion annotation that controls the popup's size and position. This gives
-a large, readable popup that doesn't cover the tab icon.
+Supports unlimited tabs across any page. Each tab is a native PDF text
+annotation with a companion popup annotation. Config format:
 
-Viewer behavior:
-- Preview (Mac): popup opens as a floating window with scrollbar. Respects
-  the /Popup rect for size and position. Click icon to open/close.
-- Adobe Reader: same — floating, scrollable, respects size/position.
-- Chrome: renders as a yellow box. Size/position partially respected.
-  Long text: scroll the PDF page to see more.
-- Firefox, mobile: popup behavior varies but content always accessible.
+    {"tabs": [
+        {"id": "abc", "page_index": 0, "click_x": 100, "click_y": 500,
+         "tab_label": "Old Code", "hidden_text": "...",
+         "anchor_word": "grounding", "anchor_word_key": "3:2"},
+        ...
+    ]}
 
+Also handles legacy single-tab format for backward compatibility.
 Also handles DOCX → PDF conversion via LibreOffice headless.
 """
 import subprocess
@@ -29,11 +28,9 @@ from pypdf.generic import (
 
 
 def convert_docx_to_pdf(docx_path: str, output_dir: str) -> str:
-    """Convert DOCX to PDF using LibreOffice headless. Returns path to PDF."""
     docx_path = Path(docx_path).resolve()
     output_dir = Path(output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
-
     profile = tempfile.mkdtemp(prefix="lo_profile_")
     try:
         cmd = [
@@ -63,32 +60,21 @@ def get_pdf_page_info(pdf_path: str):
     return len(reader.pages), sizes
 
 
-# Tab icon size (PDF points). MUST match frontend TAB_W / TAB_H.
 TAB_W = 18.0
 TAB_H = 18.0
 
 
 def _compute_layout(click_x, click_y, page_w, page_h):
-    """Return tab rect + popup rect. Popup is large and positioned to the
-    right of the icon (or left if no space), never overlapping the icon."""
     tab_w, tab_h = TAB_W, TAB_H
     tab_x = max(2, min(page_w - tab_w - 2, click_x - tab_w / 2))
     tab_y = max(2, min(page_h - tab_h - 2, click_y - tab_h / 2))
 
-    # Popup: ~60% page width, ~45% page height — large enough for real reading
     popup_w = min(420, page_w * 0.62)
     popup_h = min(360, page_h * 0.48)
-
-    # Try placing popup to the RIGHT of the icon with a 12pt gap
     popup_x = tab_x + tab_w + 12
-    # Vertically center on the icon
     popup_y = tab_y + tab_h / 2 - popup_h / 2
-
-    # If popup goes off the right edge, place it to the LEFT of the icon
     if popup_x + popup_w > page_w - 10:
         popup_x = tab_x - popup_w - 12
-
-    # Clamp to page bounds
     popup_x = max(10, min(page_w - popup_w - 10, popup_x))
     popup_y = max(10, min(page_h - popup_h - 10, popup_y))
 
@@ -99,23 +85,9 @@ def _compute_layout(click_x, click_y, page_w, page_h):
 
 
 def _build_icon_appearance_stream(writer):
-    """Small white box with gray 'v' chevron, used as /AP /N on the annotation."""
     content = (
-        b"q\n"
-        b"0.5 0.5 0.5 RG\n"
-        b"1 1 1 rg\n"
-        b"0.75 w\n"
-        b"1 1 16 16 re\n"
-        b"B\n"
-        b"Q\n"
-        b"q\n"
-        b"0.3 0.3 0.35 rg\n"
-        b"BT\n"
-        b"/F1 10 Tf\n"
-        b"5 5 Td\n"
-        b"(v) Tj\n"
-        b"ET\n"
-        b"Q\n"
+        b"q\n0.5 0.5 0.5 RG\n1 1 1 rg\n0.75 w\n1 1 16 16 re\nB\nQ\n"
+        b"q\n0.3 0.3 0.35 rg\nBT\n/F1 10 Tf\n5 5 Td\n(v) Tj\nET\nQ\n"
     )
     font_dict = DictionaryObject({
         NameObject("/Type"): NameObject("/Font"),
@@ -139,99 +111,113 @@ def _build_icon_appearance_stream(writer):
     return writer._add_object(ap_stream)
 
 
+def _parse_tabs(config):
+    """Parse config into a list of tab dicts. Supports both multi-tab and legacy formats."""
+    if "tabs" in config:
+        return [t for t in config["tabs"] if t.get("click_x") is not None]
+    elif config.get("click_x") is not None:
+        return [config]
+    return []
+
+
 def inject_tab(input_pdf_path: str, output_pdf_path: str, config: dict):
     """
-    Add a click-to-reveal sticky-note popup to the PDF with a properly sized
-    and positioned popup window.
+    Inject one or more click-to-reveal sticky-note popups into a PDF.
 
-    Idempotent: strips existing text/popup annotations on the target page first.
+    Supports config with "tabs" array (multi-tab) or legacy single-tab format.
+    Idempotent: strips all existing /Text and /Popup annotations before adding.
     """
-    page_index = int(config.get("page_index", 0))
-    click_x = float(config["click_x"])
-    click_y = float(config["click_y"])
-    tab_label = (config.get("tab_label") or "Note").strip() or "Note"
-    hidden_text = config.get("hidden_text") or ""
+    tabs = _parse_tabs(config)
+
+    if not tabs:
+        shutil.copy2(input_pdf_path, output_pdf_path)
+        return
 
     reader = PdfReader(input_pdf_path)
     writer = PdfWriter(clone_from=reader)
-
-    if page_index >= len(writer.pages):
-        page_index = 0
-    page = writer.pages[page_index]
-    box = page.mediabox
-    page_w = float(box.width)
-    page_h = float(box.height)
-
-    # Strip existing /Text and /Popup annotations (idempotent re-processing)
     annots_key = NameObject("/Annots")
-    if annots_key in page:
-        existing = page[annots_key]
-        kept = ArrayObject()
-        for a in existing:
-            try:
-                ao = a.get_object()
-                if ao.get("/Subtype") in ("/Text", "/Popup"):
-                    continue
-            except Exception:
-                pass
-            kept.append(a)
-        page[annots_key] = kept
 
-    layout = _compute_layout(click_x, click_y, page_w, page_h)
+    # Strip ALL existing /Text and /Popup annotations from ALL pages
+    for page in writer.pages:
+        if annots_key in page:
+            kept = ArrayObject()
+            for a in page[annots_key]:
+                try:
+                    ao = a.get_object()
+                    if ao.get("/Subtype") in ("/Text", "/Popup"):
+                        continue
+                except Exception:
+                    pass
+                kept.append(a)
+            page[annots_key] = kept
+
+    # Build shared appearance stream (reused for all tab icons)
     ap_ref = _build_icon_appearance_stream(writer)
 
-    # --- Build the text annotation (the icon + content) ---
-    text_annot = DictionaryObject({
-        NameObject("/Type"): NameObject("/Annot"),
-        NameObject("/Subtype"): NameObject("/Text"),
-        NameObject("/Rect"): ArrayObject([
-            FloatObject(layout["tab_x"]),
-            FloatObject(layout["tab_y"]),
-            FloatObject(layout["tab_x"] + layout["tab_w"]),
-            FloatObject(layout["tab_y"] + layout["tab_h"]),
-        ]),
-        NameObject("/Contents"): create_string_object(hidden_text),
-        NameObject("/T"): create_string_object(tab_label),
-        NameObject("/Name"): NameObject("/Comment"),
-        NameObject("/Open"): NumberObject(0),
-        NameObject("/C"): ArrayObject([
-            FloatObject(1.0), FloatObject(1.0), FloatObject(1.0),
-        ]),
-        NameObject("/F"): NumberObject(4),
-        NameObject("/AP"): DictionaryObject({
-            NameObject("/N"): ap_ref,
-        }),
-        # Default appearance: larger font for the popup content text
-        NameObject("/DA"): create_string_object("/Helv 13 Tf 0.10 0.10 0.10 rg"),
-        NameObject("/P"): page.indirect_reference,
-    })
-    text_annot_ref = writer._add_object(text_annot)
+    # Inject each tab
+    for tab in tabs:
+        page_index = int(tab.get("page_index", 0))
+        if page_index >= len(writer.pages):
+            continue
 
-    # --- Build the popup annotation (controls popup window size + position) ---
-    popup_annot = DictionaryObject({
-        NameObject("/Type"): NameObject("/Annot"),
-        NameObject("/Subtype"): NameObject("/Popup"),
-        NameObject("/Rect"): ArrayObject([
-            FloatObject(layout["popup_x"]),
-            FloatObject(layout["popup_y"]),
-            FloatObject(layout["popup_x"] + layout["popup_w"]),
-            FloatObject(layout["popup_y"] + layout["popup_h"]),
-        ]),
-        NameObject("/Parent"): text_annot_ref,
-        NameObject("/Open"): NumberObject(0),
-        NameObject("/F"): NumberObject(0),   # don't print the popup window
-    })
-    popup_ref = writer._add_object(popup_annot)
+        hidden_text = (tab.get("hidden_text") or "").strip()
+        if not hidden_text:
+            continue
 
-    # Link the text annotation to its popup
-    text_annot[NameObject("/Popup")] = popup_ref
+        click_x = float(tab["click_x"])
+        click_y = float(tab["click_y"])
+        tab_label = (tab.get("tab_label") or "Note").strip() or "Note"
 
-    # Add both annotations to the page
-    if annots_key in page:
-        page[annots_key].append(text_annot_ref)
+        page = writer.pages[page_index]
+        page_w = float(page.mediabox.width)
+        page_h = float(page.mediabox.height)
+
+        layout = _compute_layout(click_x, click_y, page_w, page_h)
+
+        # Text annotation (icon + content)
+        text_annot = DictionaryObject({
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Text"),
+            NameObject("/Rect"): ArrayObject([
+                FloatObject(layout["tab_x"]),
+                FloatObject(layout["tab_y"]),
+                FloatObject(layout["tab_x"] + layout["tab_w"]),
+                FloatObject(layout["tab_y"] + layout["tab_h"]),
+            ]),
+            NameObject("/Contents"): create_string_object(hidden_text),
+            NameObject("/T"): create_string_object(tab_label),
+            NameObject("/Name"): NameObject("/Comment"),
+            NameObject("/Open"): NumberObject(0),
+            NameObject("/C"): ArrayObject([FloatObject(1), FloatObject(1), FloatObject(1)]),
+            NameObject("/F"): NumberObject(4),
+            NameObject("/AP"): DictionaryObject({NameObject("/N"): ap_ref}),
+            NameObject("/DA"): create_string_object("/Helv 13 Tf 0.10 0.10 0.10 rg"),
+            NameObject("/P"): page.indirect_reference,
+        })
+        text_ref = writer._add_object(text_annot)
+
+        # Popup annotation (size + position)
+        popup_annot = DictionaryObject({
+            NameObject("/Type"): NameObject("/Annot"),
+            NameObject("/Subtype"): NameObject("/Popup"),
+            NameObject("/Rect"): ArrayObject([
+                FloatObject(layout["popup_x"]),
+                FloatObject(layout["popup_y"]),
+                FloatObject(layout["popup_x"] + layout["popup_w"]),
+                FloatObject(layout["popup_y"] + layout["popup_h"]),
+            ]),
+            NameObject("/Parent"): text_ref,
+            NameObject("/Open"): NumberObject(0),
+            NameObject("/F"): NumberObject(0),
+        })
+        popup_ref = writer._add_object(popup_annot)
+        text_annot[NameObject("/Popup")] = popup_ref
+
+        # Add both to page
+        if annots_key not in page:
+            page[annots_key] = ArrayObject()
+        page[annots_key].append(text_ref)
         page[annots_key].append(popup_ref)
-    else:
-        page[annots_key] = ArrayObject([text_annot_ref, popup_ref])
 
     with open(output_pdf_path, "wb") as f:
         writer.write(f)
