@@ -207,18 +207,22 @@
   .page-nav button:hover:not(:disabled) { background: var(--bg-soft); }
   .page-nav-label { padding: 0 8px; font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: 12px; }
 
-  .sidebar { width: 360px; background: var(--bg-card); border-left: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .sidebar { width: 360px; background: var(--bg-card); border-left: 1px solid var(--border); flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-scroll { flex: 1; overflow-y: auto; padding: 24px 24px 16px; display: flex; flex-direction: column; gap: 20px; min-height: 0; }
   .sidebar-title { font-family: var(--serif); font-size: 22px; font-weight: 500; letter-spacing: -0.015em; margin: 0 0 6px; }
   .placed-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; background: var(--success-soft); color: #15803d; border-radius: 999px; font-size: 12px; font-weight: 600; width: fit-content; max-width: 100%; }
   .placed-indicator.anchor { background: var(--accent-soft); color: var(--accent-dark); }
   .placed-indicator .word { display: inline-block; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; font-family: var(--serif); font-style: italic; font-weight: 500; }
-  .sidebar-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+  .sidebar-footer { flex-shrink: 0; padding: 14px 24px 20px; border-top: 1px solid var(--border); background: var(--bg-card); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 -4px 12px rgba(28, 27, 23, 0.04); }
   .secondary-actions { display: flex; gap: 8px; }
   .secondary-actions > * { flex: 1; }
   .preview-card { background: var(--accent-soft); border: 1px solid #bfdbfe; border-radius: var(--r-sm); padding: 11px 14px; font-size: 13px; color: var(--accent-dark); display: flex; align-items: center; gap: 10px; justify-content: space-between; }
   .preview-card a { color: var(--accent); font-weight: 600; text-decoration: none; }
   .preview-card a:hover { text-decoration: underline; }
   .compat-notice { background: var(--success-soft); border: 1px solid #bbf7d0; color: #166534; padding: 10px 12px; border-radius: var(--r-sm); font-size: 12px; line-height: 1.5; }
+  .char-counter { font-size: 11px; color: var(--text-subtle); margin-top: 5px; display: flex; justify-content: space-between; align-items: center; }
+  .char-counter.warn { color: var(--warn); font-weight: 600; }
+  .textarea-bounded { max-height: 220px; }
 
   /* =========== Toast =========== */
   .toast-stack { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center; }
@@ -255,8 +259,9 @@
   @media (max-width: 900px) {
     .editor-body { flex-direction: column; overflow-y: auto; }
     .pdf-area { min-height: 55vh; max-height: 55vh; padding: 12px; }
-    .sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); padding: 18px; gap: 14px; }
-    .sidebar-footer { position: sticky; bottom: 0; background: var(--bg-card); margin: 0 -18px -18px; padding: 14px 18px; border-top: 1px solid var(--border); }
+    .sidebar { width: 100%; border-left: none; border-top: 1px solid var(--border); }
+    .sidebar-scroll { padding: 18px 18px 12px; gap: 14px; }
+    .sidebar-footer { padding: 14px 18px 18px; position: sticky; bottom: 0; }
     .brand-name { display: none; }
     .editor-top { padding: 10px 12px; }
     .editor-file-name { font-size: 14px; }
@@ -588,7 +593,7 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       if (renderTaskRef.current) { try { renderTaskRef.current.cancel(); } catch {} }
-      const rt = page.render({ canvasContext: ctx, viewport });
+      const rt = page.render({ canvasContext: ctx, viewport, annotationMode: 0 });
       renderTaskRef.current = rt;
       await rt.promise;
 
@@ -1120,40 +1125,48 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
           />
         </div>
         <div className="sidebar">
-          <div>
-            <h2 className="sidebar-title">Hidden message</h2>
-            {isAnchored ? (
-              <div className="placed-indicator anchor">📌 On the line with <span className="word">{cfg.anchor_word}</span></div>
-            ) : (
-              <div className="placed-indicator">✓ Click a word to pin the note</div>
+          <div className="sidebar-scroll">
+            <div>
+              <h2 className="sidebar-title">Hidden message</h2>
+              {isAnchored ? (
+                <div className="placed-indicator anchor">📌 On the line with <span className="word">{cfg.anchor_word}</span></div>
+              ) : (
+                <div className="placed-indicator">✓ Click a word to pin the note</div>
+              )}
+            </div>
+            <div>
+              <label className="label">Popup title</label>
+              <input className="input" value={cfg.tab_label || ""} onChange={e => updateCfg({ tab_label: e.target.value })} placeholder="Show details" />
+            </div>
+            <div>
+              <label className="label">Hidden message</label>
+              <textarea ref={textareaRef} className="textarea textarea-bounded" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type what should appear..." />
+              <div className={"char-counter" + ((cfg.hidden_text?.length || 0) > 250 ? " warn" : "")}>
+                <span>{(cfg.hidden_text || "").length} characters</span>
+                {(cfg.hidden_text?.length || 0) > 250 && (
+                  <span>⚠️ Chrome may cut this off — stays fine in Preview &amp; Adobe</span>
+                )}
+              </div>
+            </div>
+            {prevId && (
+              <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0, fontSize: 13 }}>↺ Copy from previous file</button>
+            )}
+            {file.has_processed && (
+              <div className="preview-card">
+                <span>This file's saved output</span>
+                <a href={api.downloadUrl(file.id)} target="_blank" rel="noopener">Preview ↗</a>
+              </div>
+            )}
+            <div className="compat-notice">
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>✨ Works in every PDF viewer</div>
+              <div>Chrome, Safari, Preview, iPhone, Adobe Reader — your note shows up in all of them.</div>
+            </div>
+            {file.error_msg && (
+              <div style={{ background: "var(--danger-soft)", border: "1px solid #fecaca", borderRadius: "var(--r-sm)", padding: 12, fontSize: 13, color: "#991b1b" }}>
+                <b>Problem:</b> {file.error_msg}
+              </div>
             )}
           </div>
-          <div>
-            <label className="label">Popup title</label>
-            <input className="input" value={cfg.tab_label || ""} onChange={e => updateCfg({ tab_label: e.target.value })} placeholder="Show details" />
-          </div>
-          <div>
-            <label className="label">Hidden message</label>
-            <textarea ref={textareaRef} className="textarea" value={cfg.hidden_text} onChange={e => updateCfg({ hidden_text: e.target.value })} placeholder="Type what should appear..." />
-          </div>
-          {prevId && (
-            <button className="btn-ghost" onClick={copyFromPrev} style={{ alignSelf: "flex-start", paddingLeft: 0, fontSize: 13 }}>↺ Copy from previous file</button>
-          )}
-          {file.has_processed && (
-            <div className="preview-card">
-              <span>This file's saved output</span>
-              <a href={api.downloadUrl(file.id)} target="_blank" rel="noopener">Preview ↗</a>
-            </div>
-          )}
-          <div className="compat-notice">
-            <div style={{ fontWeight: 700, marginBottom: 2 }}>✨ Works in every PDF viewer</div>
-            <div>Chrome, Safari, Preview, iPhone, Adobe Reader — your note shows up in all of them.</div>
-          </div>
-          {file.error_msg && (
-            <div style={{ background: "var(--danger-soft)", border: "1px solid #fecaca", borderRadius: "var(--r-sm)", padding: 12, fontSize: 13, color: "#991b1b" }}>
-              <b>Problem:</b> {file.error_msg}
-            </div>
-          )}
           <div className="sidebar-footer">
             <button className="btn-primary" onClick={() => saveAndNext(true)} disabled={saving} style={{ width: "100%" }}>
               {saving ? "Saving..." : (nextId ? "Save and continue →" : "Save and finish")}
@@ -1162,7 +1175,6 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
               <button className="btn-secondary" onClick={() => saveAndNext(false)} disabled={saving}>Save only</button>
               <button className="btn-secondary" onClick={goBack}>Back to list</button>
             </div>
-            <button className="btn-ghost" onClick={onOpenShortcuts} style={{ alignSelf: "center", fontSize: 12, marginTop: 4 }}>Keyboard shortcuts</button>
           </div>
         </div>
       </div>
