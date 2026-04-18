@@ -46,6 +46,50 @@
     --sh-xl: 0 24px 48px rgba(28, 27, 23, 0.16), 0 8px 16px rgba(28, 27, 23, 0.10);
     --ease: cubic-bezier(0.2, 0.9, 0.3, 1);
   }
+  [data-theme="dark"] {
+    --bg: #111110;
+    --bg-card: #1a1917;
+    --bg-soft: #222120;
+    --bg-softer: #1d1c1a;
+    --text: #e8e6e0;
+    --text-muted: #a09d96;
+    --text-subtle: #6b6862;
+    --border: #2c2b27;
+    --border-strong: #3d3b34;
+    --accent: #3b82f6;
+    --accent-dark: #60a5fa;
+    --accent-soft: rgba(59, 130, 246, 0.14);
+    --success: #22c55e;
+    --success-soft: rgba(34, 197, 94, 0.12);
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --danger-soft: rgba(239, 68, 68, 0.12);
+    --sh-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --sh: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --sh-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+    --sh-xl: 0 24px 48px rgba(0, 0, 0, 0.5);
+  }
+  [data-theme="dark"] .topbar { background: rgba(17, 17, 16, 0.88); }
+  [data-theme="dark"] .pdf-frame { box-shadow: var(--sh-lg), 0 0 0 1px rgba(255,255,255,0.04); }
+  [data-theme="dark"] .drop-zone { border-color: var(--border-strong); }
+  [data-theme="dark"] .drop-zone:hover, [data-theme="dark"] .drop-zone.dragging { border-color: var(--accent); }
+  [data-theme="dark"] .overlay-tab { background: var(--bg-card); border-color: var(--border-strong); color: var(--text-muted); }
+  [data-theme="dark"] .upload-note { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.2); color: #86efac; }
+  [data-theme="dark"] .upload-note b { color: #bbf7d0; }
+  [data-theme="dark"] .compat-notice { background: rgba(34, 197, 94, 0.08); border-color: rgba(34, 197, 94, 0.2); color: #86efac; }
+  [data-theme="dark"] .compat-notice b { color: #bbf7d0; }
+  [data-theme="dark"] .status-pending { background: var(--bg-soft); color: var(--text-muted); }
+  [data-theme="dark"] .status-done { background: var(--success-soft); color: #4ade80; }
+  [data-theme="dark"] .status-processing { background: rgba(245, 158, 11, 0.12); color: #fbbf24; }
+  [data-theme="dark"] .status-error { background: var(--danger-soft); color: #f87171; }
+  [data-theme="dark"] .preview-card { background: var(--accent-soft); border-color: rgba(59, 130, 246, 0.25); color: var(--accent-dark); }
+  [data-theme="dark"] .preview-card a { color: var(--accent-dark); }
+  [data-theme="dark"] .vp-card { background: var(--bg-card); }
+  [data-theme="dark"] .vp-header { border-color: var(--border); }
+  [data-theme="dark"] .vp-close { background: var(--bg-soft); color: var(--text-muted); }
+  [data-theme="dark"] .vp-close:hover { background: var(--border-strong); color: var(--text); }
+  [data-theme="dark"] .viewer-hint { background: var(--bg-card); border-color: var(--border); }
+  html { transition: background-color 0.3s, color 0.3s; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; padding: 0; min-height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
   #root { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
@@ -415,6 +459,20 @@ function computeLayout(clickX, clickY, pageW, pageH) {
 }
 
 // =========================================================================
+// Dark mode
+// =========================================================================
+function useTheme() {
+  const [dark, setDark] = useState(() => {
+    try { return localStorage.getItem("tb-theme") === "dark"; } catch { return false; }
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    try { localStorage.setItem("tb-theme", dark ? "dark" : "light"); } catch {}
+  }, [dark]);
+  return [dark, () => setDark(d => !d)];
+}
+
+// =========================================================================
 // Toast system — supports success, error, and action toasts
 // =========================================================================
 const ToastCtx = React.createContext(() => {});
@@ -777,8 +835,8 @@ function UploadScreen({ hasFiles, onUploaded }) {
     <div className="upload-page">
       <div className="upload-hero">
         <div className="upload-eyebrow">Get started</div>
-        <h1 className="upload-title">Add a <em>hidden message</em><br/>to your documents</h1>
-        <p className="upload-sub">Upload PDFs or Word files, click where the note should live, type what stays hidden. Works in every PDF viewer.</p>
+        <h1 className="upload-title">Hide a message<br/>inside any <em>document</em></h1>
+        <p className="upload-sub">Upload your files. Click where the note goes. Type what stays hidden until someone clicks. Done.</p>
       </div>
       <div
         className={"drop-zone" + (dragging ? " dragging" : "")}
@@ -805,7 +863,7 @@ function UploadScreen({ hasFiles, onUploaded }) {
       <div className="upload-note">
         <div className="icon">✨</div>
         <div>
-          <b style={{ color: "#14532d" }}>Click the tab, popup appears.</b> In Preview, Adobe, Firefox, and mobile viewers the popup has its own scroll. In Chrome the popup is part of the page — scroll the page to see all of a long message. Click outside to close.
+          <b style={{ color: "inherit" }}>Share a link, not a file.</b> Your readers open a web link, see the document, and click the tab to reveal the message. Works on any device, any browser. They can also download the PDF.
         </div>
       </div>
       {hasFiles && (
@@ -1185,8 +1243,8 @@ function EditorScreen({ fileId, files, onRefresh, onOpenShortcuts }) {
               </div>
             )}
             <div className="compat-notice">
-              <div style={{ fontWeight: 700, marginBottom: 2 }}>✨ Works in every PDF viewer</div>
-              <div>Click the <b>v</b> icon → popup opens. Click outside → closes. In Preview &amp; Adobe the popup has its own scrollbar; in Chrome you scroll the page to see more of a long message.</div>
+              <div style={{ fontWeight: 700, marginBottom: 2 }}>✨ Share via viewer link</div>
+              <div>After saving, share the <b>Viewer</b> link. Readers click the tab icon and your message pops up — any browser, any device.</div>
             </div>
             {file.error_msg && (
               <div style={{ background: "var(--danger-soft)", border: "1px solid #fecaca", borderRadius: "var(--r-sm)", padding: 12, fontSize: 13, color: "#991b1b" }}>
@@ -1246,6 +1304,7 @@ function ViewerScreen({ fileId }) {
   const [error, setError] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [dark, toggleDark] = useTheme();
   const pdfAreaRef = useRef(null);
 
   useEffect(() => {
@@ -1289,11 +1348,12 @@ function ViewerScreen({ fileId }) {
           <span className="viewer-name">{file.original_name}</span>
         </div>
         <div className="viewer-actions">
+          <button className="btn-ghost btn-sm" onClick={toggleDark} style={{ fontSize: 15 }}>{dark ? "☀️" : "🌙"}</button>
           <button className="btn-secondary btn-sm" onClick={copyLink}>
             {copied ? "✓ Copied" : "📋 Copy link"}
           </button>
           {file.has_processed && (
-            <a className="btn-primary btn-sm" href={api.downloadUrl(file.id)} style={{ textDecoration: "none" }}>↓ Download PDF</a>
+            <a className="btn-primary btn-sm" href={api.downloadUrl(file.id)} style={{ textDecoration: "none" }}>↓ Download</a>
           )}
         </div>
       </div>
@@ -1331,6 +1391,7 @@ function App() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [dark, toggleDark] = useTheme();
   const toast = useToast();
 
   const refresh = useCallback(async () => {
@@ -1386,7 +1447,7 @@ function App() {
           <div className="top-nav">
             {route.name !== "upload" && <button className="btn-ghost" onClick={() => navigate("/upload")}>＋ Upload</button>}
             {route.name !== "list" && files.length > 0 && <button className="btn-ghost" onClick={() => navigate("/files")}>Files</button>}
-            <button className="btn-ghost" onClick={() => setShortcutsOpen(true)} title="Keyboard shortcuts (?)" style={{ padding: "7px 9px", fontSize: 13 }}>?</button>
+            <button className="btn-ghost" onClick={toggleDark} title={dark ? "Light mode" : "Dark mode"} style={{ padding: "7px 9px", fontSize: 15 }}>{dark ? "☀️" : "🌙"}</button>
           </div>
         </div>
       )}
