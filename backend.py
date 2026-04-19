@@ -3,9 +3,10 @@ FastAPI backend for the Interactive Tab PDF Builder.
 - Uploads PDFs and DOCX files
 - Stores metadata in SQLite
 - Converts DOCX → PDF via LibreOffice headless
-- Injects interactive tab per-file when config is saved
+- Injects interactive tabs per-file when config is saved
 - Serves the React frontend as a static file
 - Provides streaming zip download for bulk export
+- Session-based user isolation (cookie)
 """
 import os
 import io
@@ -17,21 +18,20 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Depends, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, ForeignKey, JSON
-from sqlalchemy.orm import declarative_base, sessionmaker, Session, relationship
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 import processing
 
 # ---------- Config ----------
 BASE_DIR = Path(os.environ.get("BASE_DIR", "/data")).resolve()
-UPLOAD_DIR = BASE_DIR / "uploads"     # original user files (incl. converted PDFs from docx)
-PROCESSED_DIR = BASE_DIR / "processed" # final files with injected tab
+UPLOAD_DIR = BASE_DIR / "uploads"
+PROCESSED_DIR = BASE_DIR / "processed"
 DB_PATH = BASE_DIR / "app.db"
 FRONTEND_HTML = Path(__file__).parent / "frontend.html"
 
@@ -47,14 +47,15 @@ Base = declarative_base()
 class FileRecord(Base):
     __tablename__ = "files"
     id = Column(String, primary_key=True)
+    session_id = Column(String, nullable=True, index=True)  # owner session
     original_name = Column(String, nullable=False)
-    kind = Column(String, nullable=False)          # "pdf" | "docx"
-    source_path = Column(String, nullable=False)   # always a PDF after any docx conversion
+    kind = Column(String, nullable=False)
+    source_path = Column(String, nullable=False)
     processed_path = Column(String, nullable=True)
     page_count = Column(Integer, default=1)
-    page_sizes = Column(JSON, default=list)        # [[w,h], ...]
-    config = Column(JSON, nullable=True)           # tab config
-    status = Column(String, default="pending")     # pending|configured|processed|error|skipped
+    page_sizes = Column(JSON, default=list)
+    config = Column(JSON, nullable=True)
+    status = Column(String, default="pending")
     error_msg = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -63,12 +64,31 @@ class FileRecord(Base):
 class Template(Base):
     __tablename__ = "templates"
     id = Column(String, primary_key=True)
+    session_id = Column(String, nullable=True, index=True)
     name = Column(String, nullable=False)
     config = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+# Create tables (will add session_id column if DB already exists via ALTER TABLE)
 Base.metadata.create_all(bind=engine)
+
+# Migrate: add session_id column if it doesn't exist (for existing databases)
+try:
+    with engine.connect() as conn:
+        from sqlalchemy import text
+        try:
+            conn.execute(text("ALTER TABLE files ADD COLUMN session_id VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass  # column already exists
+        try:
+            conn.execute(text("ALTER TABLE templates ADD COLUMN session_id VARCHAR"))
+            conn.commit()
+        except Exception:
+            pass
+except Exception:
+    pass
 
 
 def get_db():
@@ -79,15 +99,28 @@ def get_db():
         db.close()
 
 
+# ---------- Session management ----------
+SESSION_COOKIE = "tb_session"
+SESSION_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
+
+
+def get_session_id(request: Request, response: Response) -> str:
+    """Get or create a session ID from cookies."""
+    sid = request.cookies.get(SESSION_COOKIE)
+    if not sid:
+        sid = uuid.uuid4().hex
+    # Always refresh the cookie (extends expiry)
+    response.set_cookie(
+        SESSION_COOKIE, sid,
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+    )
+    return sid
+
+
 # ---------- Schemas ----------
-class TabConfig(BaseModel):
-    page_index: int = 0
-    click_x: Optional[float] = None
-    click_y: Optional[float] = None
-    tab_label: str = "Show details"
-    hidden_text: str = ""
-
-
 class FileOut(BaseModel):
     id: str
     original_name: str
@@ -132,12 +165,12 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 
 # ---------- Helpers ----------
-def _ensure_pdf(upload: UploadFile, save_dir: Path, file_id: str) -> tuple[str, str]:
-    """Save the upload to disk. If DOCX, convert to PDF. Return (kind, pdf_path)."""
+def _ensure_pdf(upload: UploadFile, save_dir: Path, file_id: str) -> tuple:
     name = upload.filename or "upload"
     ext = Path(name).suffix.lower()
     if ext not in (".pdf", ".docx"):
@@ -153,7 +186,6 @@ def _ensure_pdf(upload: UploadFile, save_dir: Path, file_id: str) -> tuple[str, 
     if ext == ".pdf":
         return ("pdf", str(raw_path))
 
-    # Convert DOCX to PDF
     try:
         pdf_path = processing.convert_docx_to_pdf(str(raw_path), str(dst_dir))
         return ("docx", pdf_path)
@@ -162,7 +194,7 @@ def _ensure_pdf(upload: UploadFile, save_dir: Path, file_id: str) -> tuple[str, 
 
 
 def _process_file(file_id: str):
-    """Background task: inject tab based on current config."""
+    """Background task: inject tabs based on current config."""
     db = SessionLocal()
     try:
         r = db.query(FileRecord).filter_by(id=file_id).first()
@@ -201,12 +233,16 @@ def health():
     return {"ok": True, "time": datetime.utcnow().isoformat()}
 
 
+# --- File management (session-scoped) ---
+
 @app.post("/api/files/upload")
 async def upload_files(
+    request: Request,
+    response: Response,
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
 ):
-    """Upload one or more files (PDF or DOCX). Converts DOCX to PDF."""
+    sid = get_session_id(request, response)
     out = []
     for upload in files:
         file_id = uuid.uuid4().hex
@@ -215,6 +251,7 @@ async def upload_files(
             num_pages, sizes = processing.get_pdf_page_info(pdf_path)
             rec = FileRecord(
                 id=file_id,
+                session_id=sid,
                 original_name=upload.filename,
                 kind=kind,
                 source_path=pdf_path,
@@ -229,16 +266,19 @@ async def upload_files(
             out.append({"error": e.detail, "name": upload.filename})
         except Exception as e:
             out.append({"error": str(e), "name": upload.filename})
-    return {"files": out}
+    return out if not out else {"files": out}
 
 
 @app.get("/api/files")
 def list_files(
+    request: Request,
+    response: Response,
     status: Optional[str] = None,
     q: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(FileRecord)
+    sid = get_session_id(request, response)
+    query = db.query(FileRecord).filter(FileRecord.session_id == sid)
     if status:
         query = query.filter(FileRecord.status == status)
     if q:
@@ -248,13 +288,23 @@ def list_files(
 
 
 @app.get("/api/files/stats")
-def stats(db: Session = Depends(get_db)):
+def stats(request: Request, response: Response, db: Session = Depends(get_db)):
+    sid = get_session_id(request, response)
     from sqlalchemy import func
-    rows = db.query(FileRecord.status, func.count(FileRecord.id)).group_by(FileRecord.status).all()
+    rows = (
+        db.query(FileRecord.status, func.count(FileRecord.id))
+        .filter(FileRecord.session_id == sid)
+        .group_by(FileRecord.status)
+        .all()
+    )
     counts = {s: c for s, c in rows}
     total = sum(counts.values())
     return {"total": total, "by_status": counts}
 
+
+# --- Single file operations ---
+# get_file, preview, download are PUBLIC (anyone with the ID can access)
+# This allows viewer links to work without authentication
 
 @app.get("/api/files/{file_id}")
 def get_file(file_id: str, db: Session = Depends(get_db)):
@@ -266,99 +316,12 @@ def get_file(file_id: str, db: Session = Depends(get_db)):
 
 @app.get("/api/files/{file_id}/preview")
 def get_preview(file_id: str, db: Session = Depends(get_db)):
-    """Serve the original (converted if DOCX) PDF bytes for previewing in-browser."""
     r = db.query(FileRecord).filter_by(id=file_id).first()
     if not r:
         raise HTTPException(404, "File not found")
     if not Path(r.source_path).exists():
         raise HTTPException(404, "Source file missing on disk")
     return FileResponse(r.source_path, media_type="application/pdf")
-
-
-@app.put("/api/files/{file_id}/config")
-def update_config(
-    file_id: str,
-    cfg: TabConfig,
-    background: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    r = db.query(FileRecord).filter_by(id=file_id).first()
-    if not r:
-        raise HTTPException(404, "File not found")
-    r.config = cfg.model_dump()
-    r.status = "configured" if cfg.click_x is not None else "pending"
-    r.updated_at = datetime.utcnow()
-    db.commit()
-    # Kick off processing if config is complete
-    if r.status == "configured":
-        background.add_task(_process_file, file_id)
-    return FileOut.from_record(r).model_dump()
-
-
-class SkipRequest(BaseModel):
-    skip: bool = True
-
-
-@app.post("/api/files/{file_id}/skip")
-def skip_file(file_id: str, req: SkipRequest, db: Session = Depends(get_db)):
-    r = db.query(FileRecord).filter_by(id=file_id).first()
-    if not r:
-        raise HTTPException(404, "File not found")
-    r.status = "skipped" if req.skip else "pending"
-    db.commit()
-    return FileOut.from_record(r).model_dump()
-
-
-@app.delete("/api/files/{file_id}")
-def delete_file(file_id: str, db: Session = Depends(get_db)):
-    r = db.query(FileRecord).filter_by(id=file_id).first()
-    if not r:
-        raise HTTPException(404, "File not found")
-    # Clean up disk
-    shutil.rmtree(UPLOAD_DIR / file_id, ignore_errors=True)
-    shutil.rmtree(PROCESSED_DIR / file_id, ignore_errors=True)
-    db.delete(r)
-    db.commit()
-    return {"ok": True}
-
-
-@app.post("/api/files/bulk-apply")
-def bulk_apply(
-    req: BulkApply,
-    background: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    """Apply the same config to many files at once."""
-    cfg_obj = TabConfig(**req.config)
-    updated = 0
-    for fid in req.file_ids:
-        r = db.query(FileRecord).filter_by(id=fid).first()
-        if not r:
-            continue
-        r.config = cfg_obj.model_dump()
-        r.status = "configured" if cfg_obj.click_x is not None else "pending"
-        r.updated_at = datetime.utcnow()
-        updated += 1
-        if r.status == "configured":
-            background.add_task(_process_file, fid)
-    db.commit()
-    return {"updated": updated}
-
-
-@app.post("/api/files/bulk-delete")
-def bulk_delete(req: BulkApply, db: Session = Depends(get_db)):
-    # Reuses file_ids field from BulkApply for simplicity
-    deleted = 0
-    for fid in req.file_ids:
-        r = db.query(FileRecord).filter_by(id=fid).first()
-        if not r:
-            continue
-        shutil.rmtree(UPLOAD_DIR / fid, ignore_errors=True)
-        shutil.rmtree(PROCESSED_DIR / fid, ignore_errors=True)
-        db.delete(r)
-        deleted += 1
-    db.commit()
-    return {"deleted": deleted}
 
 
 @app.get("/api/files/{file_id}/download")
@@ -370,10 +333,108 @@ def download_one(file_id: str, db: Session = Depends(get_db)):
     return FileResponse(r.processed_path, media_type="application/pdf", filename=out_name)
 
 
+# --- Config update (session-scoped: only owner can edit) ---
+
+@app.put("/api/files/{file_id}/config")
+async def update_config(
+    file_id: str,
+    request: Request,
+    response: Response,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    sid = get_session_id(request, response)
+    r = db.query(FileRecord).filter_by(id=file_id).first()
+    if not r:
+        raise HTTPException(404, "File not found")
+    if r.session_id and r.session_id != sid:
+        raise HTTPException(403, "Not your file")
+
+    # Accept arbitrary JSON config (supports both old and new multi-tab format)
+    body = await request.json()
+
+    r.config = body
+    r.status = "configured" if body.get("click_x") is not None else "pending"
+    r.updated_at = datetime.utcnow()
+    db.commit()
+    if r.status == "configured":
+        background.add_task(_process_file, file_id)
+    return FileOut.from_record(r).model_dump()
+
+
+@app.post("/api/files/{file_id}/skip")
+def skip_file(
+    file_id: str,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    sid = get_session_id(request, response)
+    r = db.query(FileRecord).filter_by(id=file_id).first()
+    if not r:
+        raise HTTPException(404, "File not found")
+    if r.session_id and r.session_id != sid:
+        raise HTTPException(403, "Not your file")
+    r.status = "skipped"
+    db.commit()
+    return FileOut.from_record(r).model_dump()
+
+
+@app.delete("/api/files/{file_id}")
+def delete_file(
+    file_id: str,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    sid = get_session_id(request, response)
+    r = db.query(FileRecord).filter_by(id=file_id).first()
+    if not r:
+        raise HTTPException(404, "File not found")
+    if r.session_id and r.session_id != sid:
+        raise HTTPException(403, "Not your file")
+    shutil.rmtree(UPLOAD_DIR / file_id, ignore_errors=True)
+    shutil.rmtree(PROCESSED_DIR / file_id, ignore_errors=True)
+    db.delete(r)
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/files/bulk-delete")
+def bulk_delete(
+    req: BulkApply,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    sid = get_session_id(request, response)
+    deleted = 0
+    for fid in req.file_ids:
+        r = db.query(FileRecord).filter_by(id=fid).first()
+        if not r:
+            continue
+        if r.session_id and r.session_id != sid:
+            continue
+        shutil.rmtree(UPLOAD_DIR / fid, ignore_errors=True)
+        shutil.rmtree(PROCESSED_DIR / fid, ignore_errors=True)
+        db.delete(r)
+        deleted += 1
+    db.commit()
+    return {"deleted": deleted}
+
+
 @app.get("/api/download-all")
-def download_all(db: Session = Depends(get_db)):
-    """Stream a zip of all processed files."""
-    records = db.query(FileRecord).filter(FileRecord.status == "processed").all()
+def download_all(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+):
+    sid = get_session_id(request, response)
+    records = (
+        db.query(FileRecord)
+        .filter(FileRecord.session_id == sid, FileRecord.status == "processed")
+        .all()
+    )
     if not records:
         raise HTTPException(404, "No processed files to download")
 
@@ -396,41 +457,46 @@ def download_all(db: Session = Depends(get_db)):
     return StreamingResponse(generate(), media_type="application/zip", headers=headers)
 
 
-# ---------- Templates ----------
+# ---------- Templates (session-scoped) ----------
 @app.get("/api/templates")
-def list_templates(db: Session = Depends(get_db)):
-    rows = db.query(Template).order_by(Template.created_at.desc()).all()
+def list_templates(request: Request, response: Response, db: Session = Depends(get_db)):
+    sid = get_session_id(request, response)
+    rows = db.query(Template).filter(Template.session_id == sid).order_by(Template.created_at.desc()).all()
     return {"templates": [{"id": r.id, "name": r.name, "config": r.config} for r in rows]}
 
 
 @app.post("/api/templates")
-def create_template(t: TemplateIn, db: Session = Depends(get_db)):
-    rec = Template(id=uuid.uuid4().hex, name=t.name, config=t.config)
+def create_template(t: TemplateIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    sid = get_session_id(request, response)
+    rec = Template(id=uuid.uuid4().hex, session_id=sid, name=t.name, config=t.config)
     db.add(rec)
     db.commit()
     return {"id": rec.id, "name": rec.name, "config": rec.config}
 
 
 @app.delete("/api/templates/{template_id}")
-def delete_template(template_id: str, db: Session = Depends(get_db)):
+def delete_template(template_id: str, request: Request, response: Response, db: Session = Depends(get_db)):
+    sid = get_session_id(request, response)
     r = db.query(Template).filter_by(id=template_id).first()
     if not r:
         raise HTTPException(404, "Template not found")
+    if r.session_id and r.session_id != sid:
+        raise HTTPException(403, "Not your template")
     db.delete(r)
     db.commit()
     return {"ok": True}
 
 
-# ---------- Reset (danger zone) ----------
+# ---------- Reset (session-scoped: only resets YOUR files) ----------
 @app.post("/api/reset")
-def reset_all(db: Session = Depends(get_db)):
-    """Delete all files and records. Used by the 'Clear everything' button."""
-    db.query(FileRecord).delete()
+def reset_all(request: Request, response: Response, db: Session = Depends(get_db)):
+    sid = get_session_id(request, response)
+    records = db.query(FileRecord).filter(FileRecord.session_id == sid).all()
+    for r in records:
+        shutil.rmtree(UPLOAD_DIR / r.id, ignore_errors=True)
+        shutil.rmtree(PROCESSED_DIR / r.id, ignore_errors=True)
+        db.delete(r)
     db.commit()
-    shutil.rmtree(UPLOAD_DIR, ignore_errors=True)
-    shutil.rmtree(PROCESSED_DIR, ignore_errors=True)
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     return {"ok": True}
 
 
