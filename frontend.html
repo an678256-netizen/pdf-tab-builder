@@ -471,6 +471,26 @@ const api = {
   downloadAllUrl: () => `${API}/api/download-all`,
 };
 
+// Cross-platform download helper — works on iPhone, Android, desktop
+async function downloadFile(url, filename) {
+  try {
+    const r = await fetch(url, { credentials: "include" });
+    if (!r.ok) throw new Error("Download failed");
+    const blob = await r.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename || "download.pdf";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(blobUrl); }, 1000);
+  } catch (e) {
+    // Fallback: open in new tab (user can save from there)
+    window.open(url, "_blank");
+  }
+}
+
 // =========================================================================
 // Hash-based router (reload preserves page, browser back/forward works)
 // =========================================================================
@@ -1034,6 +1054,7 @@ function FileListScreen({ files, stats, loading, onRefresh, onOpenShortcuts }) {
   };
 
   const downloadHref = done === 1 && doneFiles[0] ? api.downloadUrl(doneFiles[0].id) : api.downloadAllUrl();
+  const downloadName = done === 1 ? (doneFiles[0]?.original_name?.replace(/\.\w+$/, "_interactive.pdf") || "download.pdf") : `interactive_pdfs.zip`;
   const downloadLabel = done === 1 ? "↓ Download PDF" : `↓ Download ${done} as zip`;
   const statusText = (s) => ({ pending: "Not started", configured: "Processing…", processed: "Done", error: "Error", skipped: "Skipped" }[s] || s);
 
@@ -1046,7 +1067,7 @@ function FileListScreen({ files, stats, loading, onRefresh, onOpenShortcuts }) {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button className="btn-secondary" onClick={() => navigate("/upload")}>＋ Add files</button>
-          {done > 0 && <a className="btn-accent" href={downloadHref} style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>{downloadLabel}</a>}
+          {done > 0 && <button className="btn-accent" onClick={() => downloadFile(downloadHref, downloadName)}>{downloadLabel}</button>}
           {firstPending >= 0 && <button className="btn-primary" onClick={() => navigate(`/edit/${files[firstPending].id}`)}>{done > 0 ? "Continue →" : "Start →"}</button>}
         </div>
       </div>
@@ -1113,7 +1134,7 @@ function FileListScreen({ files, stats, loading, onRefresh, onOpenShortcuts }) {
                 </div>
                 <span className={"file-status status-" + f.status}>{statusText(f.status)}</span>
                 {f.has_processed && (
-                  <a className="btn-accent btn-sm" href={api.downloadUrl(f.id)} onClick={e => e.stopPropagation()} style={{ textDecoration: "none", fontSize: 12 }}>↓ Download</a>
+                  <button className="btn-accent btn-sm" onClick={(e) => { e.stopPropagation(); downloadFile(api.downloadUrl(f.id), f.original_name.replace(/\.\w+$/, "_interactive.pdf")); }} style={{ fontSize: 12 }}>↓ Download</button>
                 )}
               </div>
             );
@@ -1426,7 +1447,7 @@ function EditorScreen({ fileId, files, onRefresh }) {
               <div className="preview-card">
                 <span>Saved</span>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <a href={api.downloadUrl(file.id)} target="_blank" rel="noopener">PDF ↗</a>
+                  <button className="btn-ghost btn-sm" onClick={() => downloadFile(api.downloadUrl(file.id), file.original_name.replace(/\.\w+$/, "_interactive.pdf"))} style={{ padding: 0, color: "var(--accent)" }}>↓ PDF</button>
                   <a href={"#/view/" + file.id} target="_blank" rel="noopener">Viewer ↗</a>
                 </div>
               </div>
@@ -1557,7 +1578,7 @@ function ViewerScreen({ fileId }) {
             {copied ? "✓ Copied" : "📋 Copy link"}
           </button>
           {file.has_processed && (
-            <a className="btn-primary btn-sm" href={api.downloadUrl(file.id)} style={{ textDecoration: "none" }}>↓ Download</a>
+            <button className="btn-primary btn-sm" onClick={() => downloadFile(api.downloadUrl(file.id), file.original_name.replace(/\.\w+$/, "_interactive.pdf"))}>↓ Download</button>
           )}
         </div>
       </div>
