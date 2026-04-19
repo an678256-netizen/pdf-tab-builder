@@ -382,13 +382,13 @@
   }
 
   /* =========== Viewer =========== */
-  .viewer { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--bg-soft); }
-  .viewer-bar { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .viewer { display: flex; flex-direction: column; flex: 1; min-height: 0; background: var(--bg-soft); height: 100%; }
+  .viewer-bar { background: var(--bg-card); border-bottom: 1px solid var(--border); padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-shrink: 0; }
   .viewer-info { flex: 1; min-width: 0; }
   .viewer-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
   .viewer-actions { display: flex; gap: 6px; flex-shrink: 0; }
-  .viewer-hint { text-align: center; padding: 10px 16px; font-size: 13px; color: var(--text-muted); background: var(--bg-card); border-bottom: 1px solid var(--border); animation: fadeIn 0.3s; }
-  .viewer-pdf { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 24px; position: relative; min-height: 0; -webkit-overflow-scrolling: touch; }
+  .viewer-hint { text-align: center; padding: 10px 16px; font-size: 13px; color: var(--text-muted); background: var(--bg-card); border-bottom: 1px solid var(--border); animation: fadeIn 0.3s; flex-shrink: 0; }
+  .viewer-pdf { flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 24px; position: relative; min-height: 300px; -webkit-overflow-scrolling: touch; }
 
   /* Viewer popup */
   .vp-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; animation: fadeIn 0.15s var(--ease); }
@@ -431,7 +431,7 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 const API = "";
 async function apiCall(path, opts = {}) {
   try {
-    const r = await fetch(`${API}${path}`, opts);
+    const r = await fetch(`${API}${path}`, { ...opts, credentials: "include" });
     if (!r.ok) {
       const text = await r.text().catch(() => "");
       throw new Error(`${r.status} ${r.statusText}${text ? " — " + text.slice(0, 200) : ""}`);
@@ -733,6 +733,11 @@ function PdfPreview({ fileId, pageIndex, onPageChange, onWordClick, onEmptyClick
       const baseVp = page.getViewport({ scale: 1 });
       const area = wrapperRef.current.parentElement;
       const availW = area.clientWidth - 40, availH = area.clientHeight - 40;
+      // If container hasn't laid out yet, retry in 200ms
+      if (availW <= 0 || availH <= 0) {
+        setTimeout(() => renderPage(), 200);
+        return;
+      }
       const fit = Math.min(availW / baseVp.width, availH / baseVp.height, 2.2);
       const actualScale = fit * zoom;
       const viewport = page.getViewport({ scale: actualScale });
