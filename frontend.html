@@ -1510,82 +1510,64 @@ function ViewerScreen({ fileId }) {
   const [file, setFile] = useState(null);
   const [error, setError] = useState(null);
   const [popupOpen, setPopupOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [dark, toggleDark] = useTheme();
+  const [viewPage, setViewPage] = useState(0);
   const pdfAreaRef = useRef(null);
 
   useEffect(() => {
-    api.get(fileId).then(setFile).catch(e => setError(e.message));
+    if (!fileId) { setError("No file ID"); return; }
+    fetch(`${API}/api/files/${fileId}`, { credentials: "include" })
+      .then(r => { if (!r.ok) throw new Error("File not found"); return r.json(); })
+      .then(data => setFile(data))
+      .catch(e => setError(e.message || "Failed to load"));
   }, [fileId]);
 
-  useEffect(() => {
-    if (file) document.title = `${file.original_name} — Tab Builder`;
-  }, [file]);
+  if (error) return (
+    <div style={{ padding: 40, textAlign: "center" }}>
+      <h2 style={{ fontFamily: "var(--serif)", marginBottom: 8 }}>Can't load this document</h2>
+      <p style={{ color: "var(--text-muted)" }}>{error}</p>
+    </div>
+  );
 
-  // Parse tabs — hooks MUST be before any early returns (React rules of hooks)
-  const allTabs = useMemo(() => {
-    if (!file) return [];
+  if (!file) return (
+    <div style={{ padding: 60, textAlign: "center" }}>
+      <div className="spinner" style={{ marginBottom: 12 }} />
+      <div style={{ color: "var(--text-muted)", fontSize: 14 }}>Loading document...</div>
+    </div>
+  );
+
+  // Parse tabs safely
+  let allTabs = [];
+  try {
     const cfg = file.config || {};
-    if (cfg.tabs) return cfg.tabs;
-    if (cfg.click_x != null && cfg.hidden_text) return [{ id: "legacy", ...cfg }];
-    return [];
-  }, [file]);
-  const [viewPage, setViewPage] = useState(0);
-  const pageTabs = useMemo(() =>
-    allTabs.filter(t => (t.page_index || 0) === viewPage).map(t => ({ id: t.id, x: t.click_x, y: t.click_y })),
-  [allTabs, viewPage]);
+    if (cfg.tabs && Array.isArray(cfg.tabs)) allTabs = cfg.tabs;
+    else if (cfg.click_x != null && cfg.hidden_text) allTabs = [{ id: "legacy", ...cfg }];
+  } catch (e) { console.warn("tab parse error", e); }
 
-  const copyLink = () => {
-    navigator.clipboard.writeText(window.location.href).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
+  const pageTabs = allTabs
+    .filter(t => (t.page_index || 0) === viewPage)
+    .map(t => ({ id: t.id, x: t.click_x, y: t.click_y }));
 
   const openTab = (tabId) => {
     const tab = allTabs.find(t => t.id === tabId);
     if (tab) setPopupOpen(tab);
   };
 
-  if (error) return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div className="empty-state">
-        <div className="empty-icon">😕</div>
-        <h2 className="empty-title">Can't load this document</h2>
-        <p className="empty-sub">{error}</p>
-      </div>
-    </div>
-  );
-
-  if (!file) return (
-    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div className="spinner" />
-    </div>
-  );
-
-  const numPages = file.page_count || 1;
-
   return (
-    <div className="viewer">
-      <div className="viewer-bar">
-        <div className="viewer-info">
-          <span className="viewer-name">{file.original_name}</span>
-          {allTabs.length > 1 && <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 8 }}>{allTabs.length} hidden messages</span>}
-        </div>
-        <div className="viewer-actions">
-          <button className="btn-ghost btn-sm" onClick={toggleDark} style={{ fontSize: 15 }}>{dark ? "☀️" : "🌙"}</button>
-          <button className="btn-secondary btn-sm" onClick={copyLink}>
-            {copied ? "✓ Copied" : "📋 Copy link"}
-          </button>
+    <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, background: "var(--bg-soft)" }}>
+      <div style={{ background: "var(--bg-card)", borderBottom: "1px solid var(--border)", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexShrink: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{file.original_name}</div>
+        <div style={{ display: "flex", gap: 6 }}>
           {file.has_processed && (
             <button className="btn-primary btn-sm" onClick={() => downloadFile(api.downloadUrl(file.id), file.original_name.replace(/\.\w+$/, "_interactive.pdf"))}>↓ Download</button>
           )}
         </div>
       </div>
       {allTabs.length > 0 && !popupOpen && (
-        <div className="viewer-hint">Click any <b>v</b> icon to reveal a hidden message{allTabs.length > 1 ? ` (${allTabs.length} total)` : ""}</div>
+        <div style={{ textAlign: "center", padding: "10px 16px", fontSize: 13, color: "var(--text-muted)", background: "var(--bg-card)", borderBottom: "1px solid var(--border)" }}>
+          Click the <b>v</b> icon to reveal a hidden message
+        </div>
       )}
-      <div className="viewer-pdf" ref={pdfAreaRef}>
+      <div ref={pdfAreaRef} style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 20, minHeight: 300 }}>
         <PdfPreview
           fileId={file.id}
           pageIndex={viewPage}
