@@ -1522,11 +1522,29 @@ function ViewerScreen({ fileId }) {
     if (file) document.title = `${file.original_name} — Tab Builder`;
   }, [file]);
 
+  // Parse tabs — hooks MUST be before any early returns (React rules of hooks)
+  const allTabs = useMemo(() => {
+    if (!file) return [];
+    const cfg = file.config || {};
+    if (cfg.tabs) return cfg.tabs;
+    if (cfg.click_x != null && cfg.hidden_text) return [{ id: "legacy", ...cfg }];
+    return [];
+  }, [file]);
+  const [viewPage, setViewPage] = useState(0);
+  const pageTabs = useMemo(() =>
+    allTabs.filter(t => (t.page_index || 0) === viewPage).map(t => ({ id: t.id, x: t.click_x, y: t.click_y })),
+  [allTabs, viewPage]);
+
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const openTab = (tabId) => {
+    const tab = allTabs.find(t => t.id === tabId);
+    if (tab) setPopupOpen(tab);
   };
 
   if (error) return (
@@ -1545,25 +1563,7 @@ function ViewerScreen({ fileId }) {
     </div>
   );
 
-  const cfg = file.config || {};
-  // Parse tabs (supports both old single-tab and new multi-tab formats)
-  const allTabs = useMemo(() => {
-    if (cfg.tabs) return cfg.tabs;
-    if (cfg.click_x != null && cfg.hidden_text) return [{ id: "legacy", ...cfg }];
-    return [];
-  }, [file]);
-  const [viewPage, setViewPage] = useState(allTabs.length > 0 ? (allTabs[0].page_index || 0) : 0);
   const numPages = file.page_count || 1;
-
-  // Tabs visible on the current viewer page
-  const pageTabs = useMemo(() =>
-    allTabs.filter(t => (t.page_index || 0) === viewPage).map(t => ({ id: t.id, x: t.click_x, y: t.click_y })),
-  [allTabs, viewPage]);
-
-  const openTab = (tabId) => {
-    const tab = allTabs.find(t => t.id === tabId);
-    if (tab) setPopupOpen(tab);
-  };
 
   return (
     <div className="viewer">
